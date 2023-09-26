@@ -51,7 +51,7 @@ func main() {
 		}
 	}
 
-	templates = template.Must(template.New("pages").ParseFiles("templates/projects.html"))
+	templates = template.Must(template.New("pages").ParseFS(templateData, "templates/*"))
 
 	router := http.NewServeMux()
 	router.Handle("/static/", http.FileServer(http.FS(staticData)))
