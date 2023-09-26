@@ -53,8 +53,15 @@ func main() {
 
 	templates = template.Must(template.New("pages").ParseFiles("templates/projects.html"))
 
-	http.HandleFunc("/", RouteRoot)
+	router := http.NewServeMux()
+	router.HandleFunc("/", RouteRoot)
 
+	requestLogger := func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("- %s \"%s %s %s\"", r.RemoteAddr, r.Method, r.URL, r.Proto)
+			handler.ServeHTTP(w, r)
+		})
+	}
 	log.Println("Serving on port 8420...")
-	log.Fatalln(http.ListenAndServe(":8420", nil))
+	log.Fatalln(http.ListenAndServe(":8420", requestLogger(router)))
 }
