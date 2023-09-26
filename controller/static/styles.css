@@ -1,0 +1,13 @@
+html, body { background-color: #eeeeee; box-sizing: border-box; font-family: sans-serif; margin: 0; padding: 0; }
+a { color: black; }
+pre { margin: 0; }
+
+.button { background-color: #2b1e3a; display: inline-block; padding: 0.25em 0.5em; vertical-align: middle; }
+.button > a { color: white; }
+.container { margin: 0.5em; }
+.item { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.menubar { background-color: #2b1e3a; color: white; display: flex; flex-direction: row; list-style: none; margin: 0; padding: 0.25em; }
+.menubar > a.item { color: white; padding: 0.75em 1em; }
+.menubar > a.logo { height: 32px; margin: auto 1em; padding: 0; }
+.menubar > a.logo > img { height: 32px; }

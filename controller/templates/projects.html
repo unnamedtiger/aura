@@ -7,7 +7,8 @@
     <div class="menubar">
         <a class="logo" href="/"><img src="/static/logo.png" alt="Aura logo" /></a>
     </div>
-    <div>
+    <div class="container">
+        <h2>All Projects</h2>
         {{ range $project := .Projects }}
         <div class="item"><b><a href="/p/{{ $project.Slug }}">{{ $project.Name }}</a></b></div>
         {{ end }}
