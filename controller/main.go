@@ -4,13 +4,11 @@ import (
 	"database/sql"
 	"errors"
 	"flag"
-	"fmt"
 	"html/template"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -22,7 +20,7 @@ func main() {
 
 	dbFilename := "aura.db"
 	if dbDemo {
-		dbFilename = fmt.Sprintf("aura.%d.db", time.Now().Unix())
+		dbFilename = "aura.demo.db"
 	}
 	dbExists := true
 	_, err := os.Stat(dbFilename)
@@ -44,12 +42,12 @@ func main() {
 		if err != nil {
 			log.Fatalln(err)
 		}
-	}
-	if dbDemo {
-		log.Printf("Filling database with demo data...")
-		err = FillDatabaseWithDemoData()
-		if err != nil {
-			log.Fatalln(err)
+		if dbDemo {
+			log.Printf("Filling database with demo data...")
+			err = FillDatabaseWithDemoData()
+			if err != nil {
+				log.Fatalln(err)
+			}
 		}
 	}
 
