@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"html/template"
 	"log"
 	"net/http"
@@ -26,3 +27,6 @@ func RouteRoot(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 	}
 }
+
+//go:embed static/*
+var staticData embed.FS

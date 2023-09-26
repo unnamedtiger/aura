@@ -54,6 +54,7 @@ func main() {
 	templates = template.Must(template.New("pages").ParseFiles("templates/projects.html"))
 
 	router := http.NewServeMux()
+	router.Handle("/static/", http.FileServer(http.FS(staticData)))
 	router.HandleFunc("/", RouteRoot)
 
 	requestLogger := func(handler http.Handler) http.Handler {
