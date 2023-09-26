@@ -1,1 +1,5 @@
-<p>projects</p>
+<div>
+    {{ range $project := .Projects }}
+    <div class="item"><b><a href="/p/{{ $project.Slug }}">{{ $project.Name }}</a></b></div>
+    {{ end }}
+</div>
