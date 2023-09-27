@@ -25,8 +25,16 @@ type Project struct {
 	Slug string
 }
 
-func FindEntities(projectId int64, key string, limit int64) ([]Entity, error) {
-	rows, err := db.Query("SELECT id, projectId, key, val, created FROM entities WHERE projectId = ? AND key = ? ORDER BY created DESC LIMIT ?", projectId, key, limit)
+func FindEntities(projectId int64, key string, before int64, limit int64) ([]Entity, error) {
+	query := "SELECT id, projectId, key, val, created FROM entities WHERE projectId = ? AND key = ? "
+	args := []any{projectId, key}
+	if before > 0 {
+		query += "AND created < ? "
+		args = append(args, before)
+	}
+	query += "ORDER BY created DESC LIMIT ?"
+	args = append(args, limit)
+	rows, err := db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

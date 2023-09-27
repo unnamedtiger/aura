@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -82,12 +83,28 @@ func RouteProjectKey(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	more, entityList, err := prepareEntities(project.Id, entityKey, 10)
+	query := r.URL.Query()
+	before := int64(0)
+	if query.Has("before") {
+		beforeString := query.Get("before")
+		before, err = strconv.ParseInt(beforeString, 10, 64)
+		if err != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+	}
+	limit := 10
+	entityList, err := FindEntities(project.Id, entityKey, before, int64(limit+1))
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		log.Println(err)
 		return
 	}
+	more := len(entityList) > limit
+	if len(entityList) > limit {
+		entityList = entityList[:limit]
+	}
+
 	older := int64(0)
 	if more {
 		older = entityList[len(entityList)-1].Created.Unix()
@@ -137,14 +154,18 @@ func RouteProjectMain(w http.ResponseWriter, r *http.Request) {
 	sort.Strings(entityKeys)
 	entities := map[string][]Entity{}
 	entityMore := map[string]bool{}
+	limit := 10
 	for _, entityKey := range entityKeys {
-		more, entityList, err := prepareEntities(project.Id, entityKey, 10)
+		entityList, err := FindEntities(project.Id, entityKey, 0, int64(limit+1))
 		if err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			log.Println(err)
 			return
 		}
-		entityMore[entityKey] = more
+		entityMore[entityKey] = len(entityList) > limit
+		if len(entityList) > limit {
+			entityList = entityList[:limit]
+		}
 		entities[entityKey] = entityList
 	}
 
@@ -161,16 +182,4 @@ func RouteProjectMain(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println(err)
 	}
-}
-
-func prepareEntities(projectId int64, entityKey string, limit int) (bool, []Entity, error) {
-	entityList, err := FindEntities(projectId, entityKey, int64(limit+1))
-	if err != nil {
-		return false, nil, err
-	}
-	more := len(entityList) > limit
-	if len(entityList) > limit {
-		entityList = entityList[:limit]
-	}
-	return more, entityList, nil
 }
