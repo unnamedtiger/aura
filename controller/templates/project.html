@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+{{ template "headers" . }}
+</head>
+<body>
+    <div class="menubar">
+        <a class="logo" href="/"><img src="/static/logo.png" alt="Aura logo" /></a>
+        <a class="item" href="/p/{{ .ProjectSlug }}">{{ .ProjectName }}</a>
+    </div>
+    <div class="grid">
+        {{ range $key := .EntityKeys }}
+        <div>
+            <h2>{{ $key }}</h2>
+            {{ $items := index $.Entities $key }}
+            {{ range $item := $items }}
+            <div class="item"><b><a href="/p/{{ $.ProjectSlug }}/{{ $key }}/{{ $item.Val }}">{{ $item.Val }}</a></b> created {{ $item.Created }}<!-- TODO --></div>
+            {{ end }}
+            {{ $more := index $.EntityMore $key }}
+            {{ if $more }}
+            <div class="button" style="margin-top: 0.5em;"><a href="/p/{{ $.ProjectSlug }}/{{ $key }}">Show more &gt;</a></div>
+            {{ end }}
+        </div>
+        {{ end }}
+    </div>
+</body>
+</html>

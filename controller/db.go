@@ -2,16 +2,75 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"log"
 	"time"
 )
 
+var ErrNotFound = errors.New("not found")
+
 var db *sql.DB
+
+type Entity struct {
+	Id        int64
+	ProjectId int64
+	Key       string
+	Val       string
+	Created   time.Time
+}
 
 type Project struct {
 	Id   int64
 	Name string
 	Slug string
+}
+
+func FindEntities(projectId int64, key string, limit int64) ([]Entity, error) {
+	rows, err := db.Query("SELECT id, projectId, key, val, created FROM entities WHERE projectId = ? AND key = ? ORDER BY created DESC LIMIT ?", projectId, key, limit)
+	if err != nil {
+		return nil, err
+	}
+	results := []Entity{}
+	for rows.Next() {
+		entity, err := ScanEntity(rows)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, entity)
+	}
+	return results, nil
+}
+
+func FindEntityKeysByProjectId(projectId int64) ([]string, error) {
+	rows, err := db.Query("SELECT DISTINCT key FROM entities WHERE projectId = ?", projectId)
+	if err != nil {
+		return nil, err
+	}
+	results := []string{}
+	for rows.Next() {
+		var key sql.NullString
+		err := rows.Scan(&key)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, key.String)
+	}
+	return results, nil
+}
+
+func FindProjectBySlug(slug string) (Project, error) {
+	rows, err := db.Query("SELECT id, name, slug FROM projects WHERE slug = ?", slug)
+	if err != nil {
+		return Project{}, err
+	}
+	if rows.Next() {
+		project, err := ScanProject(rows)
+		if err != nil {
+			return Project{}, err
+		}
+		return project, nil
+	}
+	return Project{}, ErrNotFound
 }
 
 func LoadProjects() ([]Project, error) {
@@ -21,16 +80,38 @@ func LoadProjects() ([]Project, error) {
 	}
 	results := []Project{}
 	for rows.Next() {
-		var id sql.NullInt64
-		var name sql.NullString
-		var slug sql.NullString
-		err = rows.Scan(&id, &name, &slug)
+		project, err := ScanProject(rows)
 		if err != nil {
 			return nil, err
 		}
-		results = append(results, Project{Id: id.Int64, Name: name.String, Slug: slug.String})
+		results = append(results, project)
 	}
 	return results, nil
+}
+
+func ScanEntity(rows *sql.Rows) (Entity, error) {
+	var id sql.NullInt64
+	var projectId sql.NullInt64
+	var key sql.NullString
+	var val sql.NullString
+	var createdTimestamp sql.NullInt64
+	err := rows.Scan(&id, &projectId, &key, &val, &createdTimestamp)
+	if err != nil {
+		return Entity{}, err
+	}
+	created := time.Unix(createdTimestamp.Int64, 0)
+	return Entity{Id: id.Int64, ProjectId: projectId.Int64, Key: key.String, Val: val.String, Created: created}, nil
+}
+
+func ScanProject(rows *sql.Rows) (Project, error) {
+	var id sql.NullInt64
+	var name sql.NullString
+	var slug sql.NullString
+	err := rows.Scan(&id, &name, &slug)
+	if err != nil {
+		return Project{}, err
+	}
+	return Project{Id: id.Int64, Name: name.String, Slug: slug.String}, nil
 }
 
 func tryExec(tx *sql.Tx, query string, args ...any) {
@@ -46,7 +127,7 @@ func InitializeDatabase() error {
 		return err
 	}
 	tryExec(tx, "CREATE TABLE projects (id INTEGER PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL)")
-	tryExec(tx, "CREATE TABLE entities (id INTEGER PRIMARY KEY, projectId INTEGER, key TEXT NOT NULL, val TEXT NOT NULL, created INTEGER, FOREIGN KEY (projectId) REFERENCES projects(id))")
+	tryExec(tx, "CREATE TABLE entities (id INTEGER PRIMARY KEY, projectId INTEGER NOT NULL, key TEXT NOT NULL, val TEXT NOT NULL, created INTEGER NOT NULL, FOREIGN KEY (projectId) REFERENCES projects(id))")
 	return tx.Commit()
 }
 

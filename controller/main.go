@@ -55,6 +55,7 @@ func main() {
 
 	router := http.NewServeMux()
 	router.Handle("/static/", http.FileServer(http.FS(staticData)))
+	router.HandleFunc("/p/", RouteProject)
 	router.HandleFunc("/", RouteRoot)
 
 	requestLogger := func(handler http.Handler) http.Handler {
