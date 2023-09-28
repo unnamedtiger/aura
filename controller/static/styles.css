@@ -4,8 +4,13 @@ pre { margin: 0; }
 
 .button { background-color: #2b1e3a; display: inline-block; padding: 0.25em 0.5em; vertical-align: middle; }
 .button > a { color: white; }
+.columns { display: grid; grid-template-columns: 1fr 2fr; }
+@media (max-width: 600px) {
+    .columns { grid-template-columns: 1fr; }
+}
+.columns > div { margin: 0.5em; }
 .container { margin: 0.5em; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); margin: 0.5rem; gap: 0.5rem; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); margin: 0.5em; gap: 0.5em; }
 .item { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .menubar { background-color: #2b1e3a; color: white; display: flex; flex-direction: row; list-style: none; margin: 0; padding: 0.25em; }

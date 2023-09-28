@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+{{ template "headers" . }}
+</head>
+<body>
+    <div class="menubar">
+        <a class="logo" href="/"><img src="/static/logo.png" alt="Aura logo" /></a>
+        <a class="item" href="/j/{{ .Job.Id }}">Job #{{ .Job.Id }}</a>
+    </div>
+    <div class="columns">
+        <div>
+            {{ template "jobitem" . }}
+            <div class="item">created {{ .Job.Created }}</div>
+            <div class="item">started {{ .Job.Started }}</div>
+            <div class="item">finished {{ .Job.Ended }}</div>
+            <div class="item">took {{ .JobDuration }}</div>
+            <!--<hr/>-->
+        </div>
+        <div>
+            <!-- TODO -->
+            <pre></pre>
+        </div>
+    </div>
+</body>
+</html>

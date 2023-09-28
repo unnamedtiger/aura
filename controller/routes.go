@@ -41,6 +41,43 @@ func RouteRoot(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func RouteJob(w http.ResponseWriter, r *http.Request) {
+	jobIdString := strings.TrimPrefix(r.URL.Path, "/j/")
+	jobId, err := strconv.ParseInt(jobIdString, 10, 64)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	job, err := LoadJob(jobId)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	jobDuration := ""
+	if job.Status == StatusSucceeded || job.Status == StatusFailed {
+		jobDuration = job.Ended.Sub(job.Started).String()
+	}
+
+	type data struct {
+		Job         Job
+		JobDuration string
+		JobStatus   string
+		Minimal     bool
+		Title       string
+	}
+	title := fmt.Sprintf("Job #%d", jobId)
+	d := data{Job: job, JobDuration: jobDuration, JobStatus: jobStatus(job.Status), Minimal: true, Title: title}
+	err = templates.ExecuteTemplate(w, "job.html", d)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
 var slugRegex = regexp.MustCompile("^[0-9A-Za-z-_:]{1,260}$")
 
 func RouteProject(w http.ResponseWriter, r *http.Request) {
@@ -119,7 +156,8 @@ func RouteProjectKey(w http.ResponseWriter, r *http.Request) {
 		ProjectSlug string
 		Title       string
 	}
-	d := data{Entities: entityList, EntityKey: entityKey, Older: older, ProjectName: project.Name, ProjectSlug: project.Slug, Title: project.Name}
+	title := fmt.Sprintf("%s / %s", project.Name, entityKey)
+	d := data{Entities: entityList, EntityKey: entityKey, Older: older, ProjectName: project.Name, ProjectSlug: project.Slug, Title: title}
 	err = templates.ExecuteTemplate(w, "projectKey.html", d)
 	if err != nil {
 		log.Println(err)
@@ -228,7 +266,8 @@ func RouteProjectKeyVal(w http.ResponseWriter, r *http.Request) {
 		ProjectSlug string
 		Title       string
 	}
-	d := data{EntityKey: entityKey, EntityVal: entityVal, Jobs: dataJobs, JobsHistory: dataJobsHistory, JobsIndexes: dataJobsIndexes, ProjectName: project.Name, ProjectSlug: project.Slug, Title: project.Name}
+	title := fmt.Sprintf("%s / %s / %s", project.Name, entityKey, entityVal)
+	d := data{EntityKey: entityKey, EntityVal: entityVal, Jobs: dataJobs, JobsHistory: dataJobsHistory, JobsIndexes: dataJobsIndexes, ProjectName: project.Name, ProjectSlug: project.Slug, Title: title}
 	err = templates.ExecuteTemplate(w, "projectKeyVal.html", d)
 	if err != nil {
 		log.Println(err)
@@ -283,7 +322,8 @@ func RouteProjectMain(w http.ResponseWriter, r *http.Request) {
 		ProjectSlug string
 		Title       string
 	}
-	d := data{Entities: entities, EntityKeys: entityKeys, EntityMore: entityMore, ProjectName: project.Name, ProjectSlug: project.Slug, Title: project.Name}
+	title := project.Name
+	d := data{Entities: entities, EntityKeys: entityKeys, EntityMore: entityMore, ProjectName: project.Name, ProjectSlug: project.Slug, Title: title}
 	err = templates.ExecuteTemplate(w, "project.html", d)
 	if err != nil {
 		log.Println(err)
