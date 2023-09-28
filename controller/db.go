@@ -11,6 +11,13 @@ var ErrNotFound = errors.New("not found")
 
 var db *sql.DB
 
+const (
+	StatusCreated = iota
+	StatusStarted
+	StatusSucceeded
+	StatusFailed
+)
+
 type Entity struct {
 	Id        int64
 	ProjectId int64
@@ -136,6 +143,11 @@ func InitializeDatabase() error {
 	}
 	tryExec(tx, "CREATE TABLE projects (id INTEGER PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL)")
 	tryExec(tx, "CREATE TABLE entities (id INTEGER PRIMARY KEY, projectId INTEGER NOT NULL, key TEXT NOT NULL, val TEXT NOT NULL, created INTEGER NOT NULL, FOREIGN KEY (projectId) REFERENCES projects(id))")
+	tryExec(tx, "CREATE TABLE jobs (id INTEGER PRIMARY KEY, entityId INTEGER NOT NULL, name TEXT NOT NULL, status INTEGER NOT NULL, created INTEGER NOT NULL, earliestStart INTEGER NOT NULL, started INTEGER, ended INTEGER, FOREIGN KEY (entityId) REFERENCES entities(id))")
+	// TODO: job tag
+	// TODO: table for preceding jobs
+	// TODO: table for runners
+	// TODO: record runner a job ran on
 	return tx.Commit()
 }
 
@@ -153,6 +165,7 @@ func FillDatabaseWithDemoData() error {
 	for i := 1; i <= 135; i++ {
 		dt := t.Add(time.Duration(-(730-i)*24) * time.Hour)
 		tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 1, 'rev', ?, ?)", i, dt.Unix())
+		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?)", i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(4*time.Minute).Unix())
 	}
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'commit', '101a8f4a011a138cb6bdd3a9eb3810b6c56421a2f31a21c3a467adfa7d4b0765b7', ?)", t.Add(-1335*time.Minute).Unix())
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'commit', '10ef8fbe2d9c474169eac65aafccf626218a9fd3874b400e3d8c2cb924958e27e7', ?)", t.Add(-1215*time.Minute).Unix())
@@ -169,8 +182,13 @@ func FillDatabaseWithDemoData() error {
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '2', ?)", t.Add(-168*time.Hour).Unix())
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '3', ?)", t.Add(-120*time.Hour).Unix())
 	for i := 0; i < 11; i++ {
+		dt := t.Add(time.Duration(-(135 + i*120)) * time.Minute)
+		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?)", 136+i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(630*time.Second).Unix())
+	}
+	for i := 0; i < 11; i++ {
 		dt := t.Add(time.Duration(-(11-i)*24) * time.Hour)
 		tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'nightly', ?, ?)", dt.Format("2006-01-02"), dt.Unix())
+		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?)", 147+i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(630*time.Second).Unix())
 	}
 	return tx.Commit()
 }
