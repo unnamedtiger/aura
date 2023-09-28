@@ -186,9 +186,10 @@ func RouteProjectKeyVal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type dataJob struct {
-		Job       Job
-		JobStatus string
-		Minimal   bool
+		Job         Job
+		JobDuration string
+		JobStatus   string
+		Minimal     bool
 	}
 	dataJobs := []dataJob{}
 	dataJobsHistory := [][]dataJob{}
@@ -196,7 +197,12 @@ func RouteProjectKeyVal(w http.ResponseWriter, r *http.Request) {
 	for i, jobName := range sortedJobs {
 		dataJobsIndexes = append(dataJobsIndexes, i)
 		jobList := jobMap[jobName]
-		dataJobs = append(dataJobs, dataJob{Job: jobList[len(jobList)-1], JobStatus: jobStatus(jobList[len(jobList)-1].Status), Minimal: false})
+		job := jobList[len(jobList)-1]
+		jobDuration := ""
+		if job.Status == StatusSucceeded || job.Status == StatusFailed {
+			jobDuration = job.Ended.Sub(job.Started).String()
+		}
+		dataJobs = append(dataJobs, dataJob{Job: job, JobDuration: jobDuration, JobStatus: jobStatus(job.Status), Minimal: false})
 		subList := []dataJob{}
 		if len(jobList) > 1 {
 			dataJobs[len(dataJobs)-1].Job.Name = fmt.Sprintf("%s #%d", dataJobs[len(dataJobs)-1].Job.Name, len(jobList))

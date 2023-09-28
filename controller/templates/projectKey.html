@@ -12,7 +12,7 @@
     <div class="container">
         {{ if .Entities }}
         {{ range $item := .Entities }}
-        <div class="item"><b><a href="/p/{{ $.ProjectSlug }}/{{ $.EntityKey }}/{{ $item.Val }}">{{ $item.Val }}</a></b> created {{ $item.Created }}<!-- TODO --></div>
+        <div class="item"><b><a href="/p/{{ $.ProjectSlug }}/{{ $.EntityKey }}/{{ $item.Val }}">{{ $item.Val }}</a></b> created {{ $item.Created }}</div>
         {{ end }}
         {{ if gt .Older 0 }}
         <div class="button" style="margin-top: 0.5em;"><a href="/p/{{ .ProjectSlug }}/{{ .EntityKey }}?before={{ .Older }}">Older &gt;</a></div>

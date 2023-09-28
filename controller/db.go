@@ -275,7 +275,7 @@ func FillDatabaseWithDemoData() error {
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '1', ?)", t.Add(-168*time.Hour).Unix())
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '2', ?)", t.Add(-166*time.Hour).Unix())
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '3', ?)", t.Add(-120*time.Hour).Unix())
-	for i := 1; i < 11; i++ {
+	for i := 0; i < 10; i++ {
 		dt := t.Add(time.Duration(-(135 + i*120)) * time.Minute)
 		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?)", 136+i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(630*time.Second).Unix())
 	}

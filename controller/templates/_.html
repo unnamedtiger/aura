@@ -22,18 +22,13 @@
         <span class="title"><a href="/j/{{ .Job.Id }}">{{ .Job.Name }}</a></span>
         {{ if not .Minimal }}
         {{ if eq .JobStatus "created" }}
-        <!-- TODO -->
-        <span class="small">finished 2h13m ago, took 1m</span>
+        <span class="small">created {{ .Job.Created }}</span>
         {{ else if eq .JobStatus "started" }}
-        <span class="small">finished 2h13m ago, took 1m</span>
-        {{ else if eq .JobStatus "cancelled" }}
-        <span class="small">finished 2h13m ago, took 1m</span>
+        <span class="small">started {{ .Job.Started }}</span>
         {{ else if eq .JobStatus "succeeded" }}
-        <span class="small">finished 2h13m ago, took 1m</span>
+        <span class="small">finished {{ .Job.Ended }}, took {{ .JobDuration }}</span>
         {{ else if eq .JobStatus "failed" }}
-        <span class="small">finished 2h13m ago, took 1m</span>
-        {{ else }}
-        <span class="small"></span>
+        <span class="small">finished {{ .Job.Ended }}, took {{ .JobDuration }}</span>
         {{ end }}
         {{ end }}
     </div>
