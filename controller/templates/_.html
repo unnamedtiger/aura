@@ -16,18 +16,25 @@
 {{ end }}
 
 {{ define "jobitem" }}
-{{ $status := jobStatus .Status }}
-<div class="jobitem {{ $status }}">
-    <div class="jobicon">{{ $status }}</div>
+<div class="jobitem {{ .JobStatus }}">
+    <div class="jobicon">{{ .JobStatus }}</div>
     <div class="jobdesc">
-        <span class="title"><a href="/j/{{ .Id }}">{{ .Name }}</a></span>
-        {{ if eq $status "created" }}
+        <span class="title"><a href="/j/{{ .Job.Id }}">{{ .Job.Name }}</a></span>
+        {{ if not .Minimal }}
+        {{ if eq .JobStatus "created" }}
+        <!-- TODO -->
         <span class="small">finished 2h13m ago, took 1m</span>
-        {{ else if eq $status "started" }}
-        {{ else if eq $status "cancelled" }}
-        {{ else if eq $status "succeeded" }}
-        {{ else if eq $status "failed" }}
+        {{ else if eq .JobStatus "started" }}
+        <span class="small">finished 2h13m ago, took 1m</span>
+        {{ else if eq .JobStatus "cancelled" }}
+        <span class="small">finished 2h13m ago, took 1m</span>
+        {{ else if eq .JobStatus "succeeded" }}
+        <span class="small">finished 2h13m ago, took 1m</span>
+        {{ else if eq .JobStatus "failed" }}
+        <span class="small">finished 2h13m ago, took 1m</span>
         {{ else }}
+        <span class="small"></span>
+        {{ end }}
         {{ end }}
     </div>
 </div>

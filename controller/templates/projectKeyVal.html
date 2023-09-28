@@ -11,9 +11,18 @@
         <a class="item" href="/p/{{ .ProjectSlug }}/{{ .EntityKey }}/{{ .EntityVal }}">{{ .EntityVal }}</a>
     </div>
     {{ if .Jobs }}
-    {{ range $item := .Jobs }}
-    <div class="jobitemwrapper">
-        {{ template "jobitem" $item }}
+    {{ range $i := .JobsIndexes }}
+    {{ $jobItem := index $.Jobs $i }}
+    <div class="container">
+        {{ template "jobitem" $jobItem }}
+        {{ $historyList := index $.JobsHistory $i }}
+        {{ if $historyList }}
+        <div class="history">
+            {{ range $historyItem := $historyList }}
+            {{ template "jobitem" $historyItem }}
+            {{ end }}
+        </div>
+        {{ end }}
     </div>
     {{ end }}
     {{ else }}

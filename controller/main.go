@@ -51,10 +51,7 @@ func main() {
 		}
 	}
 
-	funcs := template.FuncMap{
-		"jobStatus": jobStatus,
-	}
-	templates = template.Must(template.New("pages").Funcs(funcs).ParseFS(templateData, "templates/*"))
+	templates = template.Must(template.New("pages").ParseFS(templateData, "templates/*"))
 
 	router := http.NewServeMux()
 	router.Handle("/static/", http.FileServer(http.FS(staticData)))

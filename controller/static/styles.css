@@ -12,3 +12,26 @@ pre { margin: 0; }
 .menubar > a.item { color: white; padding: 0.75em 1em; }
 .menubar > a.logo { height: 32px; margin: auto 1em; padding: 0; }
 .menubar > a.logo > img { height: 32px; }
+
+.jobitem { border-style: solid; border-width: 4px; display: grid; grid-template-columns: min-content auto; }
+.jobitem.succeeded { background-color: #3adb76; border-color: #3adb76; }
+.jobitem.failed { background-color: #cc4b37; border-color: #cc4b37; }
+.jobitem.started { background-color: #1779ba; border-color: #1779ba; }
+.jobitem.warning { background-color: #ffae00; border-color: #ffae00; }
+.jobitem.created { background-color: #767676; border-color: #767676; }
+.jobitem.cancelled { background-color: #181818; border-color: #181818; }
+.jobitem a { color: black; }
+.jobdesc { color: black; line-height: 1.5em; padding: 0.5em; }
+.jobitem.succeeded > .jobdesc { background-color: #e1faea; }
+.jobitem.failed > .jobdesc { background-color: #f7e4e1; }
+.jobitem.started > .jobdesc { background-color: #d7ecfa; }
+.jobitem.warning > .jobdesc { background-color: #fff3d9; }
+.jobitem.created > .jobdesc { background-color: #eaeaea; }
+.jobitem.cancelled > .jobdesc { background-color: #eaeaea; }
+.jobdesc > .title { font-weight: bold; }
+.jobdesc > .small { font-size: 0.75em; }
+.jobicon { color: white; line-height: 1.5em; padding: 0.5em; }
+
+.history { display: flex; flex-direction: row; flex-wrap: wrap; font-size: 0.75rem; }
+.history > .jobitem { margin-left: 0.5rem; }
+.history > .jobitem:first-child { margin-left: 0; }

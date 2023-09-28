@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"errors"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -173,15 +174,55 @@ func RouteProjectKeyVal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sortedJobs := []string{}
+	jobMap := map[string][]Job{}
+	for _, job := range jobs {
+		_, found := jobMap[job.Name]
+		if !found {
+			sortedJobs = append(sortedJobs, job.Name)
+			jobMap[job.Name] = []Job{}
+		}
+		jobMap[job.Name] = append(jobMap[job.Name], job)
+	}
+
+	type dataJob struct {
+		Job       Job
+		JobStatus string
+		Minimal   bool
+	}
+	dataJobs := []dataJob{}
+	dataJobsHistory := [][]dataJob{}
+	dataJobsIndexes := []int{}
+	for i, jobName := range sortedJobs {
+		dataJobsIndexes = append(dataJobsIndexes, i)
+		jobList := jobMap[jobName]
+		dataJobs = append(dataJobs, dataJob{Job: jobList[len(jobList)-1], JobStatus: jobStatus(jobList[len(jobList)-1].Status), Minimal: false})
+		subList := []dataJob{}
+		if len(jobList) > 1 {
+			dataJobs[len(dataJobs)-1].Job.Name = fmt.Sprintf("%s #%d", dataJobs[len(dataJobs)-1].Job.Name, len(jobList))
+			jobList = jobList[:len(jobList)-1]
+			for j, jobItem := range jobList {
+				jobItem.Name = fmt.Sprintf("#%d", j+1)
+				subList = append(subList, dataJob{Job: jobItem, JobStatus: jobStatus(jobItem.Status), Minimal: true})
+			}
+			for i2, j2 := 0, len(subList)-1; i2 < j2; i2, j2 = i2+1, j2-1 {
+				subList[i2], subList[j2] = subList[j2], subList[i2]
+			}
+		}
+		dataJobsHistory = append(dataJobsHistory, subList)
+	}
+
 	type data struct {
 		EntityKey   string
 		EntityVal   string
-		Jobs        []Job
+		Jobs        []dataJob
+		JobsHistory [][]dataJob
+		JobsIndexes []int
 		ProjectName string
 		ProjectSlug string
 		Title       string
 	}
-	d := data{EntityKey: entityKey, EntityVal: entityVal, Jobs: jobs, ProjectName: project.Name, ProjectSlug: project.Slug, Title: project.Name}
+	d := data{EntityKey: entityKey, EntityVal: entityVal, Jobs: dataJobs, JobsHistory: dataJobsHistory, JobsIndexes: dataJobsIndexes, ProjectName: project.Name, ProjectSlug: project.Slug, Title: project.Name}
 	err = templates.ExecuteTemplate(w, "projectKeyVal.html", d)
 	if err != nil {
 		log.Println(err)
