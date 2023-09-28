@@ -16,11 +16,19 @@
 {{ end }}
 
 {{ define "jobitem" }}
-<div class="jobitem success">
-    <div class="jobicon">ok</div>
+{{ $status := jobStatus .Status }}
+<div class="jobitem {{ $status }}">
+    <div class="jobicon">{{ $status }}</div>
     <div class="jobdesc">
         <span class="title"><a href="/j/{{ .Id }}">{{ .Name }}</a></span>
+        {{ if eq $status "created" }}
         <span class="small">finished 2h13m ago, took 1m</span>
+        {{ else if eq $status "started" }}
+        {{ else if eq $status "cancelled" }}
+        {{ else if eq $status "succeeded" }}
+        {{ else if eq $status "failed" }}
+        {{ else }}
+        {{ end }}
     </div>
 </div>
 {{ end }}

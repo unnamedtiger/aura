@@ -14,11 +14,29 @@ var db *sql.DB
 const (
 	StatusCreated = iota
 	StatusStarted
+	StatusCancelled
 	StatusSucceeded
 	StatusFailed
 
 	StatusEnd // this is the last one and it's invalid
 )
+
+func jobStatus(status int) string {
+	switch status {
+	case StatusCreated:
+		return "created"
+	case StatusStarted:
+		return "started"
+	case StatusCancelled:
+		return "cancelled"
+	case StatusSucceeded:
+		return "succeeded"
+	case StatusFailed:
+		return "failed"
+	default:
+		return "unknown"
+	}
+}
 
 type Entity struct {
 	Id        int64
@@ -257,7 +275,7 @@ func FillDatabaseWithDemoData() error {
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '1', ?)", t.Add(-168*time.Hour).Unix())
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '2', ?)", t.Add(-166*time.Hour).Unix())
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '3', ?)", t.Add(-120*time.Hour).Unix())
-	for i := 0; i < 11; i++ {
+	for i := 1; i < 11; i++ {
 		dt := t.Add(time.Duration(-(135 + i*120)) * time.Minute)
 		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?)", 136+i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(630*time.Second).Unix())
 	}
@@ -266,5 +284,19 @@ func FillDatabaseWithDemoData() error {
 		tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'nightly', ?, ?)", dt.Format("2006-01-02"), dt.Unix())
 		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?)", 150+i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(630*time.Second).Unix())
 	}
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "prepare", StatusSucceeded, t.Add(-134*time.Minute).Unix(), t.Add(-134*time.Minute).Unix(), t.Add(-133*time.Minute).Unix(), t.Add(-132*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "build:linux", StatusFailed, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-128*time.Minute).Unix(), t.Add(-118*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "build:linux", StatusFailed, t.Add(-108*time.Minute).Unix(), t.Add(-108*time.Minute).Unix(), t.Add(-107*time.Minute).Unix(), t.Add(-97*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "build:linux", StatusFailed, t.Add(-85*time.Minute).Unix(), t.Add(-85*time.Minute).Unix(), t.Add(-84*time.Minute).Unix(), t.Add(-74*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "build:linux", StatusFailed, t.Add(-62*time.Minute).Unix(), t.Add(-62*time.Minute).Unix(), t.Add(-61*time.Minute).Unix(), t.Add(-51*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "build:linux", StatusFailed, t.Add(-39*time.Minute).Unix(), t.Add(-39*time.Minute).Unix(), t.Add(-38*time.Minute).Unix(), t.Add(-28*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "build:linux", StatusSucceeded, t.Add(-16*time.Minute).Unix(), t.Add(-16*time.Minute).Unix(), t.Add(-15*time.Minute).Unix(), t.Add(-5*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "build:windows", StatusSucceeded, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-119*time.Minute).Unix(), t.Add(-107*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "test:linux", StatusCancelled, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-117*time.Minute).Unix(), t.Add(-116*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "test:linux", StatusCancelled, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-4*time.Minute).Unix(), nil)
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "test:windows", StatusSucceeded, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-107*time.Minute).Unix(), t.Add(-88*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "build:macos", StatusCreated, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), nil, nil)
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "test:macos", StatusCreated, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), nil, nil)
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "deploy", StatusCreated, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), nil, nil)
 	return tx.Commit()
 }
