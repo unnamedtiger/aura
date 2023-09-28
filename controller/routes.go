@@ -126,7 +126,66 @@ func RouteProjectKey(w http.ResponseWriter, r *http.Request) {
 }
 
 func RouteProjectKeyVal(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/p/"), "/")
+	if len(parts) != 3 {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	projectSlug := parts[0]
+	entityKey := parts[1]
+	entityVal := parts[2]
+	if !slugRegex.MatchString(projectSlug) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !slugRegex.MatchString(entityKey) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !slugRegex.MatchString(entityVal) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	project, err := FindProjectBySlug(projectSlug)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	entity, err := FindEntity(project.Id, entityKey, entityVal)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	jobs, err := FindJobs(entity.Id)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
 
+	type data struct {
+		EntityKey   string
+		EntityVal   string
+		Jobs        []Job
+		ProjectName string
+		ProjectSlug string
+		Title       string
+	}
+	d := data{EntityKey: entityKey, EntityVal: entityVal, Jobs: jobs, ProjectName: project.Name, ProjectSlug: project.Slug, Title: project.Name}
+	err = templates.ExecuteTemplate(w, "projectKeyVal.html", d)
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func RouteProjectMain(w http.ResponseWriter, r *http.Request) {

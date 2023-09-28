@@ -14,3 +14,13 @@
 <meta name="msapplication-config" content="/static/browserconfig.xml">
 <meta name="theme-color" content="#ffffff">
 {{ end }}
+
+{{ define "jobitem" }}
+<div class="jobitem success">
+    <div class="jobicon">ok</div>
+    <div class="jobdesc">
+        <span class="title"><a href="/j/{{ .Id }}">{{ .Name }}</a></span>
+        <span class="small">finished 2h13m ago, took 1m</span>
+    </div>
+</div>
+{{ end }}

@@ -16,6 +16,8 @@ const (
 	StatusStarted
 	StatusSucceeded
 	StatusFailed
+
+	StatusEnd // this is the last one and it's invalid
 )
 
 type Entity struct {
@@ -24,6 +26,17 @@ type Entity struct {
 	Key       string
 	Val       string
 	Created   time.Time
+}
+
+type Job struct {
+	Id            int64
+	EntityId      int64
+	Name          string
+	Status        int
+	Created       time.Time
+	EarliestStart time.Time
+	Started       time.Time
+	Ended         time.Time
 }
 
 type Project struct {
@@ -56,6 +69,21 @@ func FindEntities(projectId int64, key string, before int64, limit int64) ([]Ent
 	return results, nil
 }
 
+func FindEntity(projectId int64, key string, val string) (Entity, error) {
+	rows, err := db.Query("SELECT id, projectId, key, val, created FROM entities WHERE projectId = ? AND key = ? AND val = ?", projectId, key, val)
+	if err != nil {
+		return Entity{}, err
+	}
+	if rows.Next() {
+		entity, err := ScanEntity(rows)
+		if err != nil {
+			return Entity{}, err
+		}
+		return entity, nil
+	}
+	return Entity{}, ErrNotFound
+}
+
 func FindEntityKeysByProjectId(projectId int64) ([]string, error) {
 	rows, err := db.Query("SELECT DISTINCT key FROM entities WHERE projectId = ?", projectId)
 	if err != nil {
@@ -69,6 +97,22 @@ func FindEntityKeysByProjectId(projectId int64) ([]string, error) {
 			return nil, err
 		}
 		results = append(results, key.String)
+	}
+	return results, nil
+}
+
+func FindJobs(entityId int64) ([]Job, error) {
+	rows, err := db.Query("SELECT id, entityId, name, status, created, earliestStart, started, ended FROM jobs WHERE entityId = ? ORDER BY created ASC", entityId)
+	if err != nil {
+		return nil, err
+	}
+	results := []Job{}
+	for rows.Next() {
+		job, err := ScanJob(rows)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, job)
 	}
 	return results, nil
 }
@@ -116,6 +160,38 @@ func ScanEntity(rows *sql.Rows) (Entity, error) {
 	}
 	created := time.Unix(createdTimestamp.Int64, 0)
 	return Entity{Id: id.Int64, ProjectId: projectId.Int64, Key: key.String, Val: val.String, Created: created}, nil
+}
+
+func ScanJob(rows *sql.Rows) (Job, error) {
+	var id sql.NullInt64
+	var entityId sql.NullInt64
+	var name sql.NullString
+	var statusInt sql.NullInt64
+	var createdTimestamp sql.NullInt64
+	var earliestStartTimestamp sql.NullInt64
+	var startedTimestamp sql.NullInt64
+	var endedTimestamp sql.NullInt64
+	err := rows.Scan(&id, &entityId, &name, &statusInt, &createdTimestamp, &earliestStartTimestamp, &startedTimestamp, &endedTimestamp)
+	if err != nil {
+		return Job{}, err
+	}
+	status := 0
+	if statusInt.Int64 >= 0 && statusInt.Int64 < StatusEnd {
+		status = int(statusInt.Int64)
+	} else {
+		return Job{}, errors.New("invalid status")
+	}
+	created := time.Unix(createdTimestamp.Int64, 0)
+	earliestStart := time.Unix(earliestStartTimestamp.Int64, 0)
+	started := time.Unix(0, 0)
+	if startedTimestamp.Valid {
+		started = time.Unix(startedTimestamp.Int64, 0)
+	}
+	ended := time.Unix(0, 0)
+	if endedTimestamp.Valid {
+		ended = time.Unix(endedTimestamp.Int64, 0)
+	}
+	return Job{Id: id.Int64, EntityId: entityId.Int64, Name: name.String, Status: status, Created: created, EarliestStart: earliestStart, Started: started, Ended: ended}, nil
 }
 
 func ScanProject(rows *sql.Rows) (Project, error) {
@@ -178,8 +254,8 @@ func FillDatabaseWithDemoData() error {
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'commit', '100b7037fa04ee41646f7bc1604b2fad881d58b8f519778c0c0debd05895e3a106', ?)", t.Add(-375*time.Minute).Unix())
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'commit', '103b1fa64a689e780acb629ee8f4637810d0756b1462cc1d512748c07abc4515a8', ?)", t.Add(-255*time.Minute).Unix())
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'commit', '102dd7bb0ad4fa62b01c406b0f9c4cb734bb62f9c9c0f3c5de8bdecff59d1fdd1b', ?)", t.Add(-135*time.Minute).Unix())
-	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '1', ?)", t.Add(-166*time.Hour).Unix())
-	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '2', ?)", t.Add(-168*time.Hour).Unix())
+	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '1', ?)", t.Add(-168*time.Hour).Unix())
+	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '2', ?)", t.Add(-166*time.Hour).Unix())
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '3', ?)", t.Add(-120*time.Hour).Unix())
 	for i := 0; i < 11; i++ {
 		dt := t.Add(time.Duration(-(135 + i*120)) * time.Minute)
@@ -188,7 +264,7 @@ func FillDatabaseWithDemoData() error {
 	for i := 0; i < 11; i++ {
 		dt := t.Add(time.Duration(-(11-i)*24) * time.Hour)
 		tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'nightly', ?, ?)", dt.Format("2006-01-02"), dt.Unix())
-		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?)", 147+i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(630*time.Second).Unix())
+		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?)", 150+i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(630*time.Second).Unix())
 	}
 	return tx.Commit()
 }

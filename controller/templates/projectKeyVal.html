@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+{{ template "headers" . }}
+</head>
+<body>
+    <div class="menubar">
+        <a class="logo" href="/"><img src="/static/logo.png" alt="Aura logo" /></a>
+        <a class="item" href="/p/{{ .ProjectSlug }}">{{ .ProjectName }}</a>
+        <a class="item" href="/p/{{ .ProjectSlug }}/{{ .EntityKey }}">{{ .EntityKey }}</a>
+        <a class="item" href="/p/{{ .ProjectSlug }}/{{ .EntityKey }}/{{ .EntityVal }}">{{ .EntityVal }}</a>
+    </div>
+    {{ if .Jobs }}
+    {{ range $item := .Jobs }}
+    <div class="jobitemwrapper">
+        {{ template "jobitem" $item }}
+    </div>
+    {{ end }}
+    {{ else }}
+    <div class="container">
+        <div><i>No jobs found.</i></div>
+    </div>
+    {{ end }}
+</body>
+</html>

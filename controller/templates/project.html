@@ -8,6 +8,7 @@
         <a class="logo" href="/"><img src="/static/logo.png" alt="Aura logo" /></a>
         <a class="item" href="/p/{{ .ProjectSlug }}">{{ .ProjectName }}</a>
     </div>
+    {{ if .EntityKeys }}
     <div class="grid">
         {{ range $key := .EntityKeys }}
         <div>
@@ -23,5 +24,10 @@
         </div>
         {{ end }}
     </div>
+    {{ else }}
+    <div class="container">
+        <i>No entities found.</i>
+    </div>
+    {{ end }}
 </body>
 </html>

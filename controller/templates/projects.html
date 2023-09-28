@@ -9,8 +9,12 @@
     </div>
     <div class="container">
         <h2>All Projects</h2>
+        {{ if .Projects }}
         {{ range $project := .Projects }}
         <div class="item"><b><a href="/p/{{ $project.Slug }}">{{ $project.Name }}</a></b></div>
+        {{ end }}
+        {{ else }}
+        <i>No projects found.</i>
         {{ end }}
     </div>
 </body>

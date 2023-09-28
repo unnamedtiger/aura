@@ -10,11 +10,15 @@
         <a class="item" href="/p/{{ .ProjectSlug }}/{{ .EntityKey }}">{{ .EntityKey }}</a>
     </div>
     <div class="container">
+        {{ if .Entities }}
         {{ range $item := .Entities }}
         <div class="item"><b><a href="/p/{{ $.ProjectSlug }}/{{ $.EntityKey }}/{{ $item.Val }}">{{ $item.Val }}</a></b> created {{ $item.Created }}<!-- TODO --></div>
         {{ end }}
         {{ if gt .Older 0 }}
         <div class="button" style="margin-top: 0.5em;"><a href="/p/{{ .ProjectSlug }}/{{ .EntityKey }}?before={{ .Older }}">Older &gt;</a></div>
+        {{ end }}
+        {{ else }}
+        <i>No entities found.</i>
         {{ end }}
     </div>
 </body>
