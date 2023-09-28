@@ -62,16 +62,32 @@ func RouteJob(w http.ResponseWriter, r *http.Request) {
 	if job.Status == StatusSucceeded || job.Status == StatusFailed {
 		jobDuration = job.Ended.Sub(job.Started).String()
 	}
+	entity, err := LoadEntity(job.EntityId)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	project, err := LoadProject(entity.ProjectId)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
 
 	type data struct {
+		EntityKey   string
+		EntityVal   string
 		Job         Job
 		JobDuration string
 		JobStatus   string
 		Minimal     bool
+		ProjectName string
+		ProjectSlug string
 		Title       string
 	}
 	title := fmt.Sprintf("Job #%d", jobId)
-	d := data{Job: job, JobDuration: jobDuration, JobStatus: jobStatus(job.Status), Minimal: true, Title: title}
+	d := data{EntityKey: entity.Key, EntityVal: entity.Val, Job: job, JobDuration: jobDuration, JobStatus: jobStatus(job.Status), Minimal: true, ProjectName: project.Name, ProjectSlug: project.Slug, Title: title}
 	err = templates.ExecuteTemplate(w, "job.html", d)
 	if err != nil {
 		log.Println(err)

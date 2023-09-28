@@ -150,6 +150,21 @@ func FindProjectBySlug(slug string) (Project, error) {
 	return Project{}, ErrNotFound
 }
 
+func LoadEntity(id int64) (Entity, error) {
+	rows, err := db.Query("SELECT id, projectId, key, val, created FROM entities WHERE id = ?", id)
+	if err != nil {
+		return Entity{}, err
+	}
+	if rows.Next() {
+		entity, err := ScanEntity(rows)
+		if err != nil {
+			return Entity{}, err
+		}
+		return entity, nil
+	}
+	return Entity{}, ErrNotFound
+}
+
 func LoadJob(id int64) (Job, error) {
 	rows, err := db.Query("SELECT id, entityId, name, status, created, earliestStart, started, ended FROM jobs WHERE id = ?", id)
 	if err != nil {
@@ -163,6 +178,21 @@ func LoadJob(id int64) (Job, error) {
 		return job, nil
 	}
 	return Job{}, ErrNotFound
+}
+
+func LoadProject(id int64) (Project, error) {
+	rows, err := db.Query("SELECT id, name, slug FROM projects WHERE id = ?", id)
+	if err != nil {
+		return Project{}, err
+	}
+	if rows.Next() {
+		project, err := ScanProject(rows)
+		if err != nil {
+			return Project{}, err
+		}
+		return project, nil
+	}
+	return Project{}, ErrNotFound
 }
 
 func LoadProjects() ([]Project, error) {

@@ -9,8 +9,12 @@
         <a class="item" href="/j/{{ .Job.Id }}">Job #{{ .Job.Id }}</a>
     </div>
     <div class="columns">
-        <div>
-            {{ template "jobitem" . }}
+        <div style="max-width: 300px;">
+            <div class="item"><b>Project</b> <a href="/p/{{ .ProjectSlug }}">{{ .ProjectName }}</a></div>
+            <div class="item"><b>Entity</b> <a class="item" href="/p/{{ .ProjectSlug }}/{{ .EntityKey }}">{{ .EntityKey }}</a> <a class="item" href="/p/{{ .ProjectSlug }}/{{ .EntityKey }}/{{ .EntityVal }}">{{ .EntityVal }}</a></div>
+            <div style="margin: 0.5em 0;">
+                {{ template "jobitem" . }}
+            </div>
             <div class="item">created {{ .Job.Created }}</div>
             <div class="item">started {{ .Job.Started }}</div>
             <div class="item">finished {{ .Job.Ended }}</div>
