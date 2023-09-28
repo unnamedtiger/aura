@@ -57,6 +57,7 @@ func main() {
 	router.Handle("/static/", http.FileServer(http.FS(staticData)))
 	router.HandleFunc("/j/", RouteJob)
 	router.HandleFunc("/p/", RouteProject)
+	router.HandleFunc("/queue", RouteQueue)
 	router.HandleFunc("/", RouteRoot)
 
 	requestLogger := func(handler http.Handler) http.Handler {

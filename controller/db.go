@@ -150,6 +150,30 @@ func FindProjectBySlug(slug string) (Project, error) {
 	return Project{}, ErrNotFound
 }
 
+func FindQueuedJobs(before int64, limit int64) ([]Job, error) {
+	query := "SELECT id, entityId, name, status, created, earliestStart, started, ended FROM jobs WHERE status = ? "
+	args := []any{StatusCreated}
+	if before > 0 {
+		query += "AND created < ? "
+		args = append(args, before)
+	}
+	query += "ORDER BY created DESC LIMIT ?"
+	args = append(args, limit)
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	results := []Job{}
+	for rows.Next() {
+		job, err := ScanJob(rows)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, job)
+	}
+	return results, nil
+}
+
 func LoadEntity(id int64) (Entity, error) {
 	rows, err := db.Query("SELECT id, projectId, key, val, created FROM entities WHERE id = ?", id)
 	if err != nil {

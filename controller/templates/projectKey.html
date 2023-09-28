@@ -15,7 +15,7 @@
         <div class="item"><b><a href="/p/{{ $.ProjectSlug }}/{{ $.EntityKey }}/{{ $item.Val }}">{{ $item.Val }}</a></b> created {{ $item.Created }}</div>
         {{ end }}
         {{ if gt .Older 0 }}
-        <div class="button" style="margin-top: 0.5em;"><a href="/p/{{ .ProjectSlug }}/{{ .EntityKey }}?before={{ .Older }}">Older &gt;</a></div>
+        <div class="button" style="margin: 0.5em 0;"><a href="/p/{{ .ProjectSlug }}/{{ .EntityKey }}?before={{ .Older }}">Older &gt;</a></div>
         {{ end }}
         {{ else }}
         <i>No entities found.</i>

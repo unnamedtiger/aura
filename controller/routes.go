@@ -22,19 +22,24 @@ var templateData embed.FS
 var templates *template.Template
 
 func RouteRoot(w http.ResponseWriter, r *http.Request) {
-	type data struct {
-		Projects []Project
-		Title    string
+	if r.URL.Path != "/" {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
 	}
-	var err error
-	d := data{Title: "All Projects"}
-	d.Projects, err = LoadProjects()
+
+	projects, err := LoadProjects()
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		log.Println(err)
 		return
 	}
 
+	type data struct {
+		Projects []Project
+		Title    string
+	}
+	title := "All Projects"
+	d := data{Projects: projects, Title: title}
 	err = templates.ExecuteTemplate(w, "projects.html", d)
 	if err != nil {
 		log.Println(err)
@@ -341,6 +346,58 @@ func RouteProjectMain(w http.ResponseWriter, r *http.Request) {
 	title := project.Name
 	d := data{Entities: entities, EntityKeys: entityKeys, EntityMore: entityMore, ProjectName: project.Name, ProjectSlug: project.Slug, Title: title}
 	err = templates.ExecuteTemplate(w, "project.html", d)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func RouteQueue(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	before := int64(0)
+	if query.Has("before") {
+		beforeString := query.Get("before")
+		var err error
+		before, err = strconv.ParseInt(beforeString, 10, 64)
+		if err != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+	}
+	limit := 10
+	jobs, err := FindQueuedJobs(before, int64(limit+1))
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	more := len(jobs) > limit
+	if len(jobs) > limit {
+		jobs = jobs[:limit]
+	}
+	older := int64(0)
+	if more {
+		older = jobs[len(jobs)-1].Created.Unix()
+	}
+
+	type dataJob struct {
+		Job         Job
+		JobDuration string
+		JobStatus   string
+		Minimal     bool
+	}
+	dataJobs := []dataJob{}
+	for _, job := range jobs {
+		dataJobs = append(dataJobs, dataJob{Job: job, JobDuration: "", JobStatus: jobStatus(job.Status), Minimal: false})
+	}
+
+	type data struct {
+		Jobs  []dataJob
+		Older int64
+		Title string
+	}
+	title := "Queued Jobs"
+	d := data{Jobs: dataJobs, Older: older, Title: title}
+	err = templates.ExecuteTemplate(w, "queue.html", d)
 	if err != nil {
 		log.Println(err)
 	}

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+{{ template "headers" . }}
+</head>
+<body>
+    <div class="menubar">
+        <a class="logo" href="/"><img src="/static/logo.png" alt="Aura logo" /></a>
+        <a class="item" href="/queue">Job Queue</a>
+    </div>
+    {{ if .Jobs }}
+    {{ range $job := .Jobs }}
+    <div class="container">
+        {{ template "jobitem" $job }}
+    </div>
+    {{ end }}
+    {{ if gt .Older 0 }}
+    <div class="container">
+        <div class="button"><a href="/queue?before={{ .Older }}">Older &gt;</a></div>
+    </div>
+    {{ end }}
+    {{ else }}
+    <div class="container">
+        <div><i>No queued jobs found.</i></div>
+    </div>
+    {{ end }}
+</body>
+</html>
