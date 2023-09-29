@@ -417,13 +417,13 @@ func InitializeDatabase() error {
 	if err != nil {
 		return err
 	}
+	tryExec(tx, "CREATE TABLE runners (id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
 	tryExec(tx, "CREATE TABLE projects (id INTEGER PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL)")
 	tryExec(tx, "CREATE TABLE entities (id INTEGER PRIMARY KEY, projectId INTEGER NOT NULL, key TEXT NOT NULL, val TEXT NOT NULL, created INTEGER NOT NULL, FOREIGN KEY (projectId) REFERENCES projects(id))")
 	tryExec(tx, "CREATE TABLE collections (id INTEGER PRIMARY KEY, projectId INTEGER NOT NULL, key TEXT NOT NULL, val TEXT NOT NULL, created INTEGER NOT NULL, FOREIGN KEY (projectId) REFERENCES projects(id))")
 	tryExec(tx, "CREATE TABLE collectionsEntities (id INTEGER PRIMARY KEY, collectionId INTEGER NOT NULL, entityId INTEGER NOT NULL, FOREIGN KEY (collectionId) REFERENCES collections(id), FOREIGN KEY (entityId) REFERENCES entities(id))")
 	tryExec(tx, "CREATE TABLE jobs (id INTEGER PRIMARY KEY, entityId INTEGER NOT NULL, name TEXT NOT NULL, status INTEGER NOT NULL, created INTEGER NOT NULL, earliestStart INTEGER NOT NULL, started INTEGER, ended INTEGER, tag TEXT NOT NULL, exitCode INTEGER NOT NULL, FOREIGN KEY (entityId) REFERENCES entities(id))")
 	// TODO: table for preceding jobs
-	// TODO: table for runners
 	// TODO: record runner a job ran on
 	return tx.Commit()
 }
@@ -434,6 +434,10 @@ func FillDatabaseWithDemoData() error {
 	if err != nil {
 		return err
 	}
+
+	tryExec(tx, "INSERT INTO RUNNERS (id, name) VALUES (NULL, 'buildbox-windows')")
+	tryExec(tx, "INSERT INTO RUNNERS (id, name) VALUES (NULL, 'buildbox-linux')")
+	tryExec(tx, "INSERT INTO RUNNERS (id, name) VALUES (NULL, 'buildbox-macos')")
 
 	tryExec(tx, "INSERT INTO projects (id, name, slug) VALUES (NULL, 'Colors', 'colors')")
 	tryExec(tx, "INSERT INTO projects (id, name, slug) VALUES (NULL, 'Darke', 'darke')")
