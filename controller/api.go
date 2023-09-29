@@ -17,6 +17,11 @@ type ApiResponse struct {
 	Message string `json:"message"`
 }
 
+type JobRequest struct {
+	Id       int64 `json:"id"`
+	ExitCode int64 `json:"exitCode"`
+}
+
 type RunnerRequest struct {
 	Name  string   `json:"name"`
 	Tags  []string `json:"tags"`
@@ -34,37 +39,37 @@ type SubmitRequest struct {
 	EarliestStart *int64 `json:"earliestStart"`
 }
 
-func ApiSubmit(req SubmitRequest) (ApiResponse, error) {
+func ApiSubmit(req SubmitRequest) (int64, ApiResponse, error) {
 	t := time.Now()
 	if !slugRegex.MatchString(req.Name) {
-		return ApiResponse{Code: http.StatusBadRequest, Message: "invalid name"}, nil
+		return 0, ApiResponse{Code: http.StatusBadRequest, Message: "invalid name"}, nil
 	}
 	project, err := FindProjectBySlug(req.Project)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return ApiResponse{Code: http.StatusNotFound, Message: "project not found"}, nil
+			return 0, ApiResponse{Code: http.StatusNotFound, Message: "project not found"}, nil
 		}
-		return ApiResponse{}, err
+		return 0, ApiResponse{}, err
 	}
 	entity, err := FindEntity(project.Id, req.EntityKey, req.EntityVal)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			if !slugRegex.MatchString(req.EntityKey) {
-				return ApiResponse{Code: http.StatusBadRequest, Message: "invalid entityKey"}, nil
+				return 0, ApiResponse{Code: http.StatusBadRequest, Message: "invalid entityKey"}, nil
 			}
 			if !slugRegex.MatchString(req.EntityVal) {
-				return ApiResponse{Code: http.StatusBadRequest, Message: "invalid entityVal"}, nil
+				return 0, ApiResponse{Code: http.StatusBadRequest, Message: "invalid entityVal"}, nil
 			}
 			err = CreateEntity(project.Id, req.EntityKey, req.EntityVal, t)
 			if err != nil {
-				return ApiResponse{}, err
+				return 0, ApiResponse{}, err
 			}
 			entity, err = FindEntity(project.Id, req.EntityKey, req.EntityVal)
 			if err != nil {
-				return ApiResponse{}, err
+				return 0, ApiResponse{}, err
 			}
 		} else {
-			return ApiResponse{}, err
+			return 0, ApiResponse{}, err
 		}
 	}
 
@@ -72,11 +77,56 @@ func ApiSubmit(req SubmitRequest) (ApiResponse, error) {
 	if req.EarliestStart != nil {
 		earliestStart = time.Unix(*req.EarliestStart, 0)
 	}
-	err = CreateJob(entity.Id, req.Name, t, earliestStart, req.Tag)
+	jobId, err := CreateJob(entity.Id, req.Name, t, earliestStart, req.Tag)
 	if err != nil {
-		return ApiResponse{}, err
+		return 0, ApiResponse{}, err
 	}
-	return ApiResponse{Code: http.StatusAccepted, Message: "job created"}, nil
+	return jobId, ApiResponse{Code: http.StatusAccepted, Message: "job created"}, nil
+}
+
+func respond(w http.ResponseWriter, code int, data any) {
+	respBody, err := json.Marshal(data)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	w.WriteHeader(code)
+	w.Header().Add("Content-Type", "application/json")
+	w.Write(respBody)
+}
+
+func RouteApiJob(w http.ResponseWriter, r *http.Request) {
+	t := time.Now()
+	if r.Method != "POST" {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	var req JobRequest
+	err = json.Unmarshal(body, &req)
+	if err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		log.Println(err)
+		return
+	}
+
+	status := StatusFailed
+	if req.ExitCode == 0 {
+		status = StatusSucceeded
+	}
+	err = MarkJobDone(req.Id, status, req.ExitCode, t)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	respond(w, http.StatusAccepted, ApiResponse{Code: http.StatusAccepted, Message: "recorded job completion"})
 }
 
 func RouteApiRunner(w http.ResponseWriter, r *http.Request) {
@@ -137,15 +187,7 @@ func RouteApiRunner(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	respBody, err := json.Marshal(jobs)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		log.Println(err)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-	w.Header().Add("Content-Type", "application/json")
-	w.Write(respBody)
+	respond(w, http.StatusOK, jobs)
 }
 
 func RouteApiSubmit(w http.ResponseWriter, r *http.Request) {
@@ -167,19 +209,19 @@ func RouteApiSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// TODO: auth
-	resp, err := ApiSubmit(req)
+	jobId, resp, err := ApiSubmit(req)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		log.Println(err)
 		return
 	}
-	respBody, err := json.Marshal(resp)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		log.Println(err)
+	if resp.Code == http.StatusAccepted {
+		type positiveResponse struct {
+			Id int64 `json:"id"`
+		}
+		d := positiveResponse{Id: jobId}
+		respond(w, resp.Code, d)
 		return
 	}
-	w.WriteHeader(resp.Code)
-	w.Header().Add("Content-Type", "application/json")
-	w.Write(respBody)
+	respond(w, resp.Code, resp)
 }

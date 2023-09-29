@@ -77,9 +77,12 @@ func CreateEntity(projectId int64, key string, val string, created time.Time) er
 	return err
 }
 
-func CreateJob(entityId int64, name string, created time.Time, earliestStart time.Time, tag string) error {
-	_, err := db.Exec("INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, 0)", entityId, name, StatusCreated, created.Unix(), earliestStart.Unix(), tag)
-	return err
+func CreateJob(entityId int64, name string, created time.Time, earliestStart time.Time, tag string) (int64, error) {
+	res, err := db.Exec("INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, 0)", entityId, name, StatusCreated, created.Unix(), earliestStart.Unix(), tag)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
 }
 
 func FindCollection(projectId int64, key string, val string) (EntityOrCollection, error) {
@@ -415,6 +418,22 @@ func LoadRunners() ([]Runner, error) {
 		results = append(results, runner)
 	}
 	return results, nil
+}
+
+func MarkJobDone(jobId int64, status int, exitCode int64, now time.Time) error {
+	res, err := db.Exec("UPDATE jobs SET status = ?, ended = ?, exitCode = ? WHERE id = ? AND status = ?", status, now.Unix(), exitCode, jobId, StatusStarted)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 1 {
+		return nil
+	} else {
+		return ErrNotFound
+	}
 }
 
 func ReserveJobForRunner(jobId int64, runnerId int64, now time.Time) (Job, error) {
