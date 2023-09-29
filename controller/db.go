@@ -64,6 +64,16 @@ type Project struct {
 	Slug string
 }
 
+func CreateEntity(projectId int64, key string, val string, created time.Time) error {
+	_, err := db.Exec("INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, ?, ?, ?, ?)", projectId, key, val, created.Unix())
+	return err
+}
+
+func CreateJob(entityId int64, name string, created time.Time, earliestStart time.Time) error {
+	_, err := db.Exec("INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, NULL, NULL)", entityId, name, StatusCreated, created.Unix(), earliestStart.Unix())
+	return err
+}
+
 func FindCollection(projectId int64, key string, val string) (EntityOrCollection, error) {
 	return findEntityOrCollection("collections", projectId, key, val)
 }
