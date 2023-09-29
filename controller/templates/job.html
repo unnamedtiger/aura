@@ -16,10 +16,17 @@
                 {{ template "jobitem" . }}
             </div>
             <div class="item">created {{ .Job.Created }}</div>
+            {{ if or (or (eq .JobStatus "started") (eq .JobStatus "succeeded")) (eq .JobStatus "failed") }}
             <div class="item">started {{ .Job.Started }}</div>
+            {{ end }}
+            {{ if or (eq .JobStatus "succeeded") (eq .JobStatus "failed") }}
             <div class="item">finished {{ .Job.Ended }}</div>
             <div class="item">took {{ .JobDuration }}</div>
-            <!--<hr/>-->
+            {{ end }}
+            <hr/>
+            {{ if or (eq .JobStatus "succeeded") (eq .JobStatus "failed") }}
+            <div class="item"><b>Exit Code</b> {{ .Job.ExitCode }}</div>
+            {{ end }}
         </div>
         <div>
             <!-- TODO -->
