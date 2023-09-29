@@ -248,6 +248,23 @@ func FindJobs(entityId int64) ([]Job, error) {
 	return results, nil
 }
 
+func FindJobsForRunner(tag string, limit int64) ([]int64, error) {
+	rows, err := db.Query("SELECT id FROM jobs WHERE tag = ? ORDER BY created ASC LIMIT ?", tag, limit)
+	if err != nil {
+		return nil, err
+	}
+	results := []int64{}
+	for rows.Next() {
+		var id int64
+		err := rows.Scan(&id)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, id)
+	}
+	return results, nil
+}
+
 func FindProjectBySlug(slug string) (Project, error) {
 	rows, err := db.Query("SELECT id, name, slug FROM projects WHERE slug = ?", slug)
 	if err != nil {
@@ -286,6 +303,22 @@ func FindQueuedJobs(before int64, limit int64) ([]Job, error) {
 		results = append(results, job)
 	}
 	return results, nil
+}
+
+func FindRunnerByName(name string) (Runner, error) {
+	rows, err := db.Query("SELECT id, name FROM runners WHERE name = ?", name)
+	if err != nil {
+		return Runner{}, err
+	}
+	if rows.Next() {
+		runner, err := ScanRunner(rows)
+		rows.Close()
+		if err != nil {
+			return Runner{}, err
+		}
+		return runner, nil
+	}
+	return Runner{}, ErrNotFound
 }
 
 func LoadEntity(id int64) (EntityOrCollection, error) {
@@ -382,6 +415,22 @@ func LoadRunners() ([]Runner, error) {
 		results = append(results, runner)
 	}
 	return results, nil
+}
+
+func ReserveJobForRunner(jobId int64, runnerId int64, now time.Time) (Job, error) {
+	res, err := db.Exec("UPDATE jobs SET status = ?, started = ?, runner = ? WHERE id = ? AND status = ?", StatusStarted, now.Unix(), runnerId, jobId, StatusCreated)
+	if err != nil {
+		return Job{}, err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return Job{}, err
+	}
+	if rows == 1 {
+		return LoadJob(jobId)
+	} else {
+		return Job{}, ErrNotFound
+	}
 }
 
 func ScanEntityOrCollection(rows *sql.Rows) (EntityOrCollection, error) {

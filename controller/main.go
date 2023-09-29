@@ -55,6 +55,7 @@ func main() {
 
 	router := http.NewServeMux()
 	router.Handle("/static/", http.FileServer(http.FS(staticData)))
+	router.HandleFunc("/api/runner", RouteApiRunner)
 	router.HandleFunc("/api/submit", RouteApiSubmit)
 	router.HandleFunc("/j/", RouteJob)
 	router.HandleFunc("/p/", RouteProject)
