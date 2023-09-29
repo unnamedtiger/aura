@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -51,6 +52,8 @@ func main() {
 		}
 	}
 
+	runnerCheckins = make(map[string]time.Time)
+	tagCheckins = make(map[string]time.Time)
 	templates = template.Must(template.New("pages").ParseFS(templateData, "templates/*"))
 
 	router := http.NewServeMux()

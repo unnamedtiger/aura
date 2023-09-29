@@ -251,8 +251,8 @@ func FindJobs(entityId int64) ([]Job, error) {
 	return results, nil
 }
 
-func FindJobsForRunner(tag string, limit int64) ([]int64, error) {
-	rows, err := db.Query("SELECT id FROM jobs WHERE tag = ? ORDER BY created ASC LIMIT ?", tag, limit)
+func FindJobsForRunner(tag string, limit int64, now time.Time) ([]int64, error) {
+	rows, err := db.Query("SELECT DISTINCT jobs.id FROM jobs LEFT JOIN precedingJobs ON jobs.id = precedingJobs.newerJob WHERE precedingJobs.newerJob IS NULL AND jobs.tag = ? AND jobs.status = ? AND jobs.earliestStart >= ? ORDER BY jobs.created ASC LIMIT ?", tag, StatusCreated, now.Unix(), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -264,6 +264,22 @@ func FindJobsForRunner(tag string, limit int64) ([]int64, error) {
 			return nil, err
 		}
 		results = append(results, id)
+	}
+	return results, nil
+}
+
+func FindPrecedingJobs(id int64) ([]Job, error) {
+	rows, err := db.Query("SELECT jobs.id, jobs.entityId, jobs.name, jobs.status, jobs.created, jobs.earliestStart, jobs.started, jobs.ended, jobs.tag, jobs.runner, jobs.exitCode FROM precedingJobs INNER JOIN jobs ON precedingJobs.olderJob = jobs.id WHERE precedingJobs.newerJob = ?", id)
+	if err != nil {
+		return nil, err
+	}
+	results := []Job{}
+	for rows.Next() {
+		job, err := ScanJob(rows)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, job)
 	}
 	return results, nil
 }
@@ -544,7 +560,7 @@ func InitializeDatabase() error {
 	tryExec(tx, "CREATE TABLE collections (id INTEGER PRIMARY KEY, projectId INTEGER NOT NULL, key TEXT NOT NULL, val TEXT NOT NULL, created INTEGER NOT NULL, FOREIGN KEY (projectId) REFERENCES projects(id))")
 	tryExec(tx, "CREATE TABLE collectionsEntities (id INTEGER PRIMARY KEY, collectionId INTEGER NOT NULL, entityId INTEGER NOT NULL, FOREIGN KEY (collectionId) REFERENCES collections(id), FOREIGN KEY (entityId) REFERENCES entities(id))")
 	tryExec(tx, "CREATE TABLE jobs (id INTEGER PRIMARY KEY, entityId INTEGER NOT NULL, name TEXT NOT NULL, status INTEGER NOT NULL, created INTEGER NOT NULL, earliestStart INTEGER NOT NULL, started INTEGER, ended INTEGER, tag TEXT NOT NULL, runner INTEGER, exitCode INTEGER NOT NULL, FOREIGN KEY (entityId) REFERENCES entities(id), FOREIGN KEY (runner) REFERENCES runners(id))")
-	// TODO: table for preceding jobs
+	tryExec(tx, "CREATE TABLE precedingJobs (id INTEGER PRIMARY KEY, olderJob INTEGER NOT NULL, newerJob INTEGER NOT NULL, FOREIGN KEY (olderJob) References jobs(id), FOREIGN KEY (newerJob) REFERENCES jobs(id))")
 	return tx.Commit()
 }
 
@@ -612,7 +628,8 @@ func FillDatabaseWithDemoData() error {
 	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,windows', 1, 0)", 146, "test:windows", StatusSucceeded, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-107*time.Minute).Unix(), t.Add(-88*time.Minute).Unix())
 	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,macos', NULL, 0)", 146, "build:macos", StatusCreated, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), nil, nil)
 	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,macos', NULL, 0)", 146, "test:macos", StatusCreated, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), nil, nil)
-	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', NULL, 0)", 146, "deploy", StatusCreated, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), nil, nil)
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', NULL, 0)", 146, "deploy", StatusCreated, t.Add(-132*time.Minute).Unix(), t.Add(348*time.Minute).Unix(), nil, nil)
+	tryExec(tx, "INSERT INTO precedingJobs (id, olderJob, newerJob) VALUES (NULL, ?, ?)", 168, 169)
 
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 2, 'version', 'v1.0.0', ?)", t.Unix())
 	return tx.Commit()

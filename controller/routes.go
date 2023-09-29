@@ -48,6 +48,7 @@ func RouteRoot(w http.ResponseWriter, r *http.Request) {
 }
 
 func RouteJob(w http.ResponseWriter, r *http.Request) {
+	t := time.Now()
 	jobIdString := strings.TrimPrefix(r.URL.Path, "/j/")
 	jobId, err := strconv.ParseInt(jobIdString, 10, 64)
 	if err != nil {
@@ -90,20 +91,43 @@ func RouteJob(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	type data struct {
-		EntityKey   string
-		EntityVal   string
+	type dataJob struct {
 		Job         Job
 		JobDuration string
 		JobStatus   string
 		Minimal     bool
-		ProjectName string
-		ProjectSlug string
-		Runner      Runner
-		Title       string
+	}
+	precedingJobs, err := FindPrecedingJobs(job.Id)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	precedingDataJobs := []dataJob{}
+	for _, precedingJob := range precedingJobs {
+		jobDuration := ""
+		if precedingJob.Status == StatusSucceeded || precedingJob.Status == StatusFailed {
+			jobDuration = precedingJob.Ended.Sub(precedingJob.Started).String()
+		}
+		precedingDataJobs = append(precedingDataJobs, dataJob{Job: precedingJob, JobDuration: jobDuration, JobStatus: jobStatus(precedingJob.Status), Minimal: false})
+	}
+
+	type data struct {
+		EntityKey            string
+		EntityVal            string
+		Job                  Job
+		JobDuration          string
+		JobStatus            string
+		Minimal              bool
+		PrecedingJobs        []dataJob
+		ProjectName          string
+		ProjectSlug          string
+		Runner               Runner
+		Title                string
+		WaitingEarliestStart bool
 	}
 	title := fmt.Sprintf("Job #%d", jobId)
-	d := data{EntityKey: entity.Key, EntityVal: entity.Val, Job: job, JobDuration: jobDuration, JobStatus: jobStatus(job.Status), Minimal: true, ProjectName: project.Name, ProjectSlug: project.Slug, Runner: runner, Title: title}
+	d := data{EntityKey: entity.Key, EntityVal: entity.Val, Job: job, JobDuration: jobDuration, JobStatus: jobStatus(job.Status), Minimal: true, PrecedingJobs: precedingDataJobs, ProjectName: project.Name, ProjectSlug: project.Slug, Runner: runner, Title: title, WaitingEarliestStart: job.EarliestStart.After(t)}
 	err = templates.ExecuteTemplate(w, "job.html", d)
 	if err != nil {
 		log.Println(err)
