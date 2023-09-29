@@ -9,6 +9,9 @@ import (
 	"time"
 )
 
+var runnerCheckins map[string]time.Time
+var tagCheckins map[string]time.Time
+
 type ApiResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`

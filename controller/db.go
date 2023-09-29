@@ -66,6 +66,11 @@ type Project struct {
 	Slug string
 }
 
+type Runner struct {
+	Id   int64
+	Name string
+}
+
 func CreateEntity(projectId int64, key string, val string, created time.Time) error {
 	_, err := db.Exec("INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, ?, ?, ?, ?)", projectId, key, val, created.Unix())
 	return err
@@ -346,6 +351,22 @@ func LoadProjects() ([]Project, error) {
 	return results, nil
 }
 
+func LoadRunners() ([]Runner, error) {
+	rows, err := db.Query("SELECT id, name FROM runners ORDER BY name ASC")
+	if err != nil {
+		return nil, err
+	}
+	results := []Runner{}
+	for rows.Next() {
+		runner, err := ScanRunner(rows)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, runner)
+	}
+	return results, nil
+}
+
 func ScanEntityOrCollection(rows *sql.Rows) (EntityOrCollection, error) {
 	var id int64
 	var projectId int64
@@ -403,6 +424,16 @@ func ScanProject(rows *sql.Rows) (Project, error) {
 		return Project{}, err
 	}
 	return Project{Id: id, Name: name, Slug: slug}, nil
+}
+
+func ScanRunner(rows *sql.Rows) (Runner, error) {
+	var id int64
+	var name string
+	err := rows.Scan(&id, &name)
+	if err != nil {
+		return Runner{}, err
+	}
+	return Runner{Id: id, Name: name}, nil
 }
 
 func tryExec(tx *sql.Tx, query string, args ...any) {

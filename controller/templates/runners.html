@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+{{ template "headers" . }}
+</head>
+<body>
+    <div class="menubar">
+        <a class="logo" href="/"><img src="/static/logo.png" alt="Aura logo" /></a>
+        <a class="item" href="/queue">Job Queue</a>
+        <a class="item" href="/runners">Runner Status</a>
+    </div>
+    <div class="container">
+        <h2>Runners</h2>
+        {{ if .Runners }}
+        {{ range $item := .Runners }}
+        <div class="item"><b>{{ $item.Name }}</b> last check-in {{ $item.Date }}</div>
+        {{ end }}
+        {{ else }}
+        <i>No recently checked-in runners found.</i>
+        {{ end }}
+        {{ if .OfflineRunners }}
+        <h2>Offline Runners</h2>
+        {{ range $item := .OfflineRunners }}
+        <div class="item"><b>{{ $item }}</b></div>
+        {{ end }}
+        {{ end }}
+        <h2>Tags</h2>
+        {{ if .Tags }}
+        {{ range $item := .Tags }}
+        <div class="item"><b>{{ $item.Name }}</b> last check-in {{ $item.Date }}</div>
+        {{ end }}
+        {{ else }}
+        <i>No recently checked-in tags found.</i>
+        {{ end }}
+    </div>
+</body>
+</html>

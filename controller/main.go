@@ -59,6 +59,7 @@ func main() {
 	router.HandleFunc("/j/", RouteJob)
 	router.HandleFunc("/p/", RouteProject)
 	router.HandleFunc("/queue", RouteQueue)
+	router.HandleFunc("/runners", RouteRunners)
 	router.HandleFunc("/", RouteRoot)
 
 	requestLogger := func(handler http.Handler) http.Handler {

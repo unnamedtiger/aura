@@ -8,8 +8,10 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 //go:embed static/*
@@ -454,6 +456,53 @@ func RouteQueue(w http.ResponseWriter, r *http.Request) {
 	title := "Queued Jobs"
 	d := data{Jobs: dataJobs, Older: older, Title: title}
 	err = templates.ExecuteTemplate(w, "queue.html", d)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func RouteRunners(w http.ResponseWriter, r *http.Request) {
+	type dataItem struct {
+		Name string
+		Date time.Time
+	}
+
+	runnersData, err := LoadRunners()
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	runners := []dataItem{}
+	offlineRunners := []string{}
+	for _, runnerData := range runnersData {
+		checkin, found := runnerCheckins[runnerData.Name]
+		if found {
+			runners = append(runners, dataItem{Name: runnerData.Name, Date: checkin})
+		} else {
+			offlineRunners = append(offlineRunners, runnerData.Name)
+		}
+	}
+
+	tags := []dataItem{}
+	tagNames := make([]string, 0, len(tagCheckins))
+	for k := range tagCheckins {
+		tagNames = append(tagNames, k)
+	}
+	sort.Strings(tagNames)
+	for _, tagName := range tagNames {
+		tags = append(tags, dataItem{Name: tagName, Date: tagCheckins[tagName]})
+	}
+
+	type data struct {
+		Runners        []dataItem
+		OfflineRunners []string
+		Tags           []dataItem
+		Title          string
+	}
+	title := "Runner Status"
+	d := data{Runners: runners, OfflineRunners: offlineRunners, Tags: tags, Title: title}
+	err = templates.ExecuteTemplate(w, "runners.html", d)
 	if err != nil {
 		log.Println(err)
 	}
