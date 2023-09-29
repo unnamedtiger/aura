@@ -367,5 +367,7 @@ func FillDatabaseWithDemoData() error {
 	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "build:macos", StatusCreated, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), nil, nil)
 	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "test:macos", StatusCreated, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), nil, nil)
 	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "deploy", StatusCreated, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), nil, nil)
+
+	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 2, 'version', 'v1.0.0', ?)", t.Unix())
 	return tx.Commit()
 }

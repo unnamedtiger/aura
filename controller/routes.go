@@ -99,7 +99,7 @@ func RouteJob(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var slugRegex = regexp.MustCompile("^[0-9A-Za-z-_:]{1,260}$")
+var slugRegex = regexp.MustCompile(`^[0-9A-Za-z-_:\.]{1,260}$`)
 
 func RouteProject(w http.ResponseWriter, r *http.Request) {
 	p := strings.TrimPrefix(r.URL.Path, "/p/")
