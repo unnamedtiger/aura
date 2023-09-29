@@ -85,6 +85,11 @@ func CreateJob(entityId int64, name string, created time.Time, earliestStart tim
 	return res.LastInsertId()
 }
 
+func CreatePrecedingJob(olderJob int64, newerJob int64) error {
+	_, err := db.Exec("INSERT INTO precedingJobs (id, olderJob, newerJob) VALUES (NULL, ?, ?)", olderJob, newerJob)
+	return err
+}
+
 func FindCollection(projectId int64, key string, val string) (EntityOrCollection, error) {
 	return findEntityOrCollection("collections", projectId, key, val)
 }
@@ -340,6 +345,23 @@ func FindRunnerByName(name string) (Runner, error) {
 	return Runner{}, ErrNotFound
 }
 
+func FindSuccedingJobIds(id int64) ([]int64, error) {
+	rows, err := db.Query("SELECT newerJob FROM precedingJobs WHERE olderJob = ?", id)
+	if err != nil {
+		return nil, err
+	}
+	results := []int64{}
+	for rows.Next() {
+		var id int64
+		err := rows.Scan(&id)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, id)
+	}
+	return results, nil
+}
+
 func LoadEntity(id int64) (EntityOrCollection, error) {
 	rows, err := db.Query("SELECT id, projectId, key, val, created FROM entities WHERE id = ?", id)
 	if err != nil {
@@ -450,6 +472,14 @@ func MarkJobDone(jobId int64, status int, exitCode int64, now time.Time) error {
 	} else {
 		return ErrNotFound
 	}
+}
+
+func MarkPrecedingJobCompleted(jobId int64) error {
+	_, err := db.Exec("DELETE FROM precedingJobs WHERE olderJob = ?", jobId)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func ReserveJobForRunner(jobId int64, runnerId int64, now time.Time) (Job, error) {

@@ -36,7 +36,8 @@ type SubmitRequest struct {
 
 	Tag string `json:"tag"`
 
-	EarliestStart *int64 `json:"earliestStart"`
+	PrecedingJobs []int64 `json:"precedingJobs"`
+	EarliestStart *int64  `json:"earliestStart"`
 }
 
 func ApiSubmit(req SubmitRequest) (int64, ApiResponse, error) {
@@ -80,6 +81,40 @@ func ApiSubmit(req SubmitRequest) (int64, ApiResponse, error) {
 	jobId, err := CreateJob(entity.Id, req.Name, t, earliestStart, req.Tag)
 	if err != nil {
 		return 0, ApiResponse{}, err
+	}
+
+	for _, precedingJob := range req.PrecedingJobs {
+		_, err := LoadJob(precedingJob)
+		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				return 0, ApiResponse{Code: http.StatusBadRequest, Message: "invalid preceding job"}, nil
+			}
+			return 0, ApiResponse{}, err
+		}
+		err = CreatePrecedingJob(precedingJob, jobId)
+		if err != nil {
+			return 0, ApiResponse{}, err
+		}
+		// NOTE: loading this job again to avoid race condition
+		precedingJob, err := LoadJob(precedingJob)
+		if err != nil {
+			return 0, ApiResponse{}, err
+		}
+		if precedingJob.Status == StatusCancelled || precedingJob.Status == StatusFailed {
+			err = MarkPrecedingJobCompleted(precedingJob.Id)
+			if err != nil {
+				return 0, ApiResponse{}, err
+			}
+			err = MarkJobDone(jobId, StatusCancelled, 0, t)
+			if err != nil {
+				return 0, ApiResponse{}, err
+			}
+		} else if precedingJob.Status == StatusSucceeded {
+			err = MarkPrecedingJobCompleted(precedingJob.Id)
+			if err != nil {
+				return 0, ApiResponse{}, err
+			}
+		}
 	}
 	return jobId, ApiResponse{Code: http.StatusAccepted, Message: "job created"}, nil
 }
@@ -126,7 +161,31 @@ func RouteApiJob(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
+	go handlePrecedingJobCompleted(req.Id, status, t)
 	respond(w, http.StatusAccepted, ApiResponse{Code: http.StatusAccepted, Message: "recorded job completion"})
+}
+
+func handlePrecedingJobCompleted(jobId int64, status int, now time.Time) {
+	if status == StatusFailed || status == StatusCancelled {
+		succedingJobIds, err := FindSuccedingJobIds(jobId)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		for _, succedingJobId := range succedingJobIds {
+			err = MarkJobDone(succedingJobId, StatusCancelled, 0, now)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			handlePrecedingJobCompleted(succedingJobId, StatusCancelled, now)
+		}
+	}
+	err := MarkPrecedingJobCompleted(jobId)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 }
 
 func RouteApiRunner(w http.ResponseWriter, r *http.Request) {
