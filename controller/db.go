@@ -346,41 +346,41 @@ func LoadProjects() ([]Project, error) {
 }
 
 func ScanEntityOrCollection(rows *sql.Rows) (EntityOrCollection, error) {
-	var id sql.NullInt64
-	var projectId sql.NullInt64
-	var key sql.NullString
-	var val sql.NullString
-	var createdTimestamp sql.NullInt64
+	var id int64
+	var projectId int64
+	var key string
+	var val string
+	var createdTimestamp int64
 	err := rows.Scan(&id, &projectId, &key, &val, &createdTimestamp)
 	if err != nil {
 		return EntityOrCollection{}, err
 	}
-	created := time.Unix(createdTimestamp.Int64, 0)
-	return EntityOrCollection{Id: id.Int64, ProjectId: projectId.Int64, Key: key.String, Val: val.String, Created: created}, nil
+	created := time.Unix(createdTimestamp, 0)
+	return EntityOrCollection{Id: id, ProjectId: projectId, Key: key, Val: val, Created: created}, nil
 }
 
 func ScanJob(rows *sql.Rows) (Job, error) {
-	var id sql.NullInt64
-	var entityId sql.NullInt64
-	var name sql.NullString
-	var statusInt sql.NullInt64
-	var createdTimestamp sql.NullInt64
-	var earliestStartTimestamp sql.NullInt64
+	var id int64
+	var entityId int64
+	var name string
+	var statusInt int64
+	var createdTimestamp int64
+	var earliestStartTimestamp int64
 	var startedTimestamp sql.NullInt64
 	var endedTimestamp sql.NullInt64
-	var exitCode sql.NullInt64
+	var exitCode int64
 	err := rows.Scan(&id, &entityId, &name, &statusInt, &createdTimestamp, &earliestStartTimestamp, &startedTimestamp, &endedTimestamp, &exitCode)
 	if err != nil {
 		return Job{}, err
 	}
 	status := 0
-	if statusInt.Int64 >= 0 && statusInt.Int64 < StatusEnd {
-		status = int(statusInt.Int64)
+	if statusInt >= 0 && statusInt < StatusEnd {
+		status = int(statusInt)
 	} else {
 		return Job{}, errors.New("invalid status")
 	}
-	created := time.Unix(createdTimestamp.Int64, 0)
-	earliestStart := time.Unix(earliestStartTimestamp.Int64, 0)
+	created := time.Unix(createdTimestamp, 0)
+	earliestStart := time.Unix(earliestStartTimestamp, 0)
 	started := time.Unix(0, 0)
 	if startedTimestamp.Valid {
 		started = time.Unix(startedTimestamp.Int64, 0)
@@ -389,18 +389,18 @@ func ScanJob(rows *sql.Rows) (Job, error) {
 	if endedTimestamp.Valid {
 		ended = time.Unix(endedTimestamp.Int64, 0)
 	}
-	return Job{Id: id.Int64, EntityId: entityId.Int64, Name: name.String, Status: status, Created: created, EarliestStart: earliestStart, Started: started, Ended: ended, ExitCode: exitCode.Int64}, nil
+	return Job{Id: id, EntityId: entityId, Name: name, Status: status, Created: created, EarliestStart: earliestStart, Started: started, Ended: ended, ExitCode: exitCode}, nil
 }
 
 func ScanProject(rows *sql.Rows) (Project, error) {
-	var id sql.NullInt64
-	var name sql.NullString
-	var slug sql.NullString
+	var id int64
+	var name string
+	var slug string
 	err := rows.Scan(&id, &name, &slug)
 	if err != nil {
 		return Project{}, err
 	}
-	return Project{Id: id.Int64, Name: name.String, Slug: slug.String}, nil
+	return Project{Id: id, Name: name, Slug: slug}, nil
 }
 
 func tryExec(tx *sql.Tx, query string, args ...any) {
