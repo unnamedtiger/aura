@@ -80,6 +80,15 @@ func RouteJob(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
+	runner := Runner{}
+	if job.Runner > 0 {
+		runner, err = LoadRunner(job.Runner)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+	}
 
 	type data struct {
 		EntityKey   string
@@ -90,10 +99,11 @@ func RouteJob(w http.ResponseWriter, r *http.Request) {
 		Minimal     bool
 		ProjectName string
 		ProjectSlug string
+		Runner      Runner
 		Title       string
 	}
 	title := fmt.Sprintf("Job #%d", jobId)
-	d := data{EntityKey: entity.Key, EntityVal: entity.Val, Job: job, JobDuration: jobDuration, JobStatus: jobStatus(job.Status), Minimal: true, ProjectName: project.Name, ProjectSlug: project.Slug, Title: title}
+	d := data{EntityKey: entity.Key, EntityVal: entity.Val, Job: job, JobDuration: jobDuration, JobStatus: jobStatus(job.Status), Minimal: true, ProjectName: project.Name, ProjectSlug: project.Slug, Runner: runner, Title: title}
 	err = templates.ExecuteTemplate(w, "job.html", d)
 	if err != nil {
 		log.Println(err)

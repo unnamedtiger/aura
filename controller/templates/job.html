@@ -25,6 +25,9 @@
             {{ end }}
             <hr/>
             <div class="item"><b>Tag</b> {{ .Job.Tag }}</div>
+            {{ if or (or (eq .JobStatus "started") (eq .JobStatus "succeeded")) (eq .JobStatus "failed") }}
+            <div class="item"><b>Runner</b> {{ .Runner.Name }}</div>
+            {{ end }}
             {{ if or (eq .JobStatus "succeeded") (eq .JobStatus "failed") }}
             <div class="item"><b>Exit Code</b> {{ .Job.ExitCode }}</div>
             {{ end }}

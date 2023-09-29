@@ -57,6 +57,7 @@ type Job struct {
 	Started       time.Time
 	Ended         time.Time
 	Tag           string
+	Runner        int64
 	ExitCode      int64
 }
 
@@ -77,7 +78,7 @@ func CreateEntity(projectId int64, key string, val string, created time.Time) er
 }
 
 func CreateJob(entityId int64, name string, created time.Time, earliestStart time.Time, tag string) error {
-	_, err := db.Exec("INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, NULL, NULL, ?, 0)", entityId, name, StatusCreated, created.Unix(), earliestStart.Unix(), tag)
+	_, err := db.Exec("INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, 0)", entityId, name, StatusCreated, created.Unix(), earliestStart.Unix(), tag)
 	return err
 }
 
@@ -232,7 +233,7 @@ func FindEntityOrCollectionKeysByProjectId(projectId int64) ([]string, error) {
 }
 
 func FindJobs(entityId int64) ([]Job, error) {
-	rows, err := db.Query("SELECT id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode FROM jobs WHERE entityId = ? ORDER BY created ASC", entityId)
+	rows, err := db.Query("SELECT id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode FROM jobs WHERE entityId = ? ORDER BY created ASC", entityId)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +265,7 @@ func FindProjectBySlug(slug string) (Project, error) {
 }
 
 func FindQueuedJobs(before int64, limit int64) ([]Job, error) {
-	query := "SELECT id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode FROM jobs WHERE status = ? "
+	query := "SELECT id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode FROM jobs WHERE status = ? "
 	args := []any{StatusCreated}
 	if before > 0 {
 		query += "AND created < ? "
@@ -304,7 +305,7 @@ func LoadEntity(id int64) (EntityOrCollection, error) {
 }
 
 func LoadJob(id int64) (Job, error) {
-	rows, err := db.Query("SELECT id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode FROM jobs WHERE id = ?", id)
+	rows, err := db.Query("SELECT id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode FROM jobs WHERE id = ?", id)
 	if err != nil {
 		return Job{}, err
 	}
@@ -351,6 +352,22 @@ func LoadProjects() ([]Project, error) {
 	return results, nil
 }
 
+func LoadRunner(id int64) (Runner, error) {
+	rows, err := db.Query("SELECT id, name FROM runners WHERE id = ?", id)
+	if err != nil {
+		return Runner{}, err
+	}
+	if rows.Next() {
+		runner, err := ScanRunner(rows)
+		rows.Close()
+		if err != nil {
+			return Runner{}, err
+		}
+		return runner, nil
+	}
+	return Runner{}, ErrNotFound
+}
+
 func LoadRunners() ([]Runner, error) {
 	rows, err := db.Query("SELECT id, name FROM runners ORDER BY name ASC")
 	if err != nil {
@@ -391,8 +408,9 @@ func ScanJob(rows *sql.Rows) (Job, error) {
 	var startedTimestamp sql.NullInt64
 	var endedTimestamp sql.NullInt64
 	var tag string
+	var runnerId sql.NullInt64
 	var exitCode int64
-	err := rows.Scan(&id, &entityId, &name, &statusInt, &createdTimestamp, &earliestStartTimestamp, &startedTimestamp, &endedTimestamp, &tag, &exitCode)
+	err := rows.Scan(&id, &entityId, &name, &statusInt, &createdTimestamp, &earliestStartTimestamp, &startedTimestamp, &endedTimestamp, &tag, &runnerId, &exitCode)
 	if err != nil {
 		return Job{}, err
 	}
@@ -412,7 +430,11 @@ func ScanJob(rows *sql.Rows) (Job, error) {
 	if endedTimestamp.Valid {
 		ended = time.Unix(endedTimestamp.Int64, 0)
 	}
-	return Job{Id: id, EntityId: entityId, Name: name, Status: status, Created: created, EarliestStart: earliestStart, Started: started, Ended: ended, Tag: tag, ExitCode: exitCode}, nil
+	runner := int64(0)
+	if runnerId.Valid {
+		runner = runnerId.Int64
+	}
+	return Job{Id: id, EntityId: entityId, Name: name, Status: status, Created: created, EarliestStart: earliestStart, Started: started, Ended: ended, Tag: tag, Runner: runner, ExitCode: exitCode}, nil
 }
 
 func ScanProject(rows *sql.Rows) (Project, error) {
@@ -453,9 +475,8 @@ func InitializeDatabase() error {
 	tryExec(tx, "CREATE TABLE entities (id INTEGER PRIMARY KEY, projectId INTEGER NOT NULL, key TEXT NOT NULL, val TEXT NOT NULL, created INTEGER NOT NULL, FOREIGN KEY (projectId) REFERENCES projects(id))")
 	tryExec(tx, "CREATE TABLE collections (id INTEGER PRIMARY KEY, projectId INTEGER NOT NULL, key TEXT NOT NULL, val TEXT NOT NULL, created INTEGER NOT NULL, FOREIGN KEY (projectId) REFERENCES projects(id))")
 	tryExec(tx, "CREATE TABLE collectionsEntities (id INTEGER PRIMARY KEY, collectionId INTEGER NOT NULL, entityId INTEGER NOT NULL, FOREIGN KEY (collectionId) REFERENCES collections(id), FOREIGN KEY (entityId) REFERENCES entities(id))")
-	tryExec(tx, "CREATE TABLE jobs (id INTEGER PRIMARY KEY, entityId INTEGER NOT NULL, name TEXT NOT NULL, status INTEGER NOT NULL, created INTEGER NOT NULL, earliestStart INTEGER NOT NULL, started INTEGER, ended INTEGER, tag TEXT NOT NULL, exitCode INTEGER NOT NULL, FOREIGN KEY (entityId) REFERENCES entities(id))")
+	tryExec(tx, "CREATE TABLE jobs (id INTEGER PRIMARY KEY, entityId INTEGER NOT NULL, name TEXT NOT NULL, status INTEGER NOT NULL, created INTEGER NOT NULL, earliestStart INTEGER NOT NULL, started INTEGER, ended INTEGER, tag TEXT NOT NULL, runner INTEGER, exitCode INTEGER NOT NULL, FOREIGN KEY (entityId) REFERENCES entities(id), FOREIGN KEY (runner) REFERENCES runners(id))")
 	// TODO: table for preceding jobs
-	// TODO: record runner a job ran on
 	return tx.Commit()
 }
 
@@ -477,7 +498,7 @@ func FillDatabaseWithDemoData() error {
 	for i := 1; i <= 135; i++ {
 		dt := t.Add(time.Duration(-(730-i)*24) * time.Hour)
 		tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 1, 'rev', ?, ?)", i, dt.Unix())
-		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?, 'docker,linux', 0)", i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(4*time.Minute).Unix())
+		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?, 'docker,linux', 2, 0)", i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(4*time.Minute).Unix())
 	}
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'commit', '101a8f4a011a138cb6bdd3a9eb3810b6c56421a2f31a21c3a467adfa7d4b0765b7', ?)", t.Add(-1335*time.Minute).Unix())
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'commit', '10ef8fbe2d9c474169eac65aafccf626218a9fd3874b400e3d8c2cb924958e27e7', ?)", t.Add(-1215*time.Minute).Unix())
@@ -503,27 +524,27 @@ func FillDatabaseWithDemoData() error {
 	tryExec(tx, "INSERT INTO collectionsEntities (id, collectionId, entityId) VALUES (NULL, 3, 145)")
 	for i := 0; i < 10; i++ {
 		dt := t.Add(time.Duration(-(135 + i*120)) * time.Minute)
-		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?, 'docker,linux', 0)", 136+i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(630*time.Second).Unix())
+		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?, 'docker,linux', 2, 0)", 136+i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(630*time.Second).Unix())
 	}
 	for i := 0; i < 11; i++ {
 		dt := t.Add(time.Duration(-(11-i)*24) * time.Hour)
 		tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'nightly', ?, ?)", dt.Format("2006-01-02"), dt.Unix())
-		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?, 'docker,linux', 0)", 147+i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(630*time.Second).Unix())
+		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?, 'docker,linux', 2, 0)", 147+i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(630*time.Second).Unix())
 	}
-	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 0)", 146, "prepare", StatusSucceeded, t.Add(-134*time.Minute).Unix(), t.Add(-134*time.Minute).Unix(), t.Add(-133*time.Minute).Unix(), t.Add(-132*time.Minute).Unix())
-	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 1)", 146, "build:linux", StatusFailed, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-128*time.Minute).Unix(), t.Add(-118*time.Minute).Unix())
-	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 1)", 146, "build:linux", StatusFailed, t.Add(-108*time.Minute).Unix(), t.Add(-108*time.Minute).Unix(), t.Add(-107*time.Minute).Unix(), t.Add(-97*time.Minute).Unix())
-	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 1)", 146, "build:linux", StatusFailed, t.Add(-85*time.Minute).Unix(), t.Add(-85*time.Minute).Unix(), t.Add(-84*time.Minute).Unix(), t.Add(-74*time.Minute).Unix())
-	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 1)", 146, "build:linux", StatusFailed, t.Add(-62*time.Minute).Unix(), t.Add(-62*time.Minute).Unix(), t.Add(-61*time.Minute).Unix(), t.Add(-51*time.Minute).Unix())
-	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 1)", 146, "build:linux", StatusFailed, t.Add(-39*time.Minute).Unix(), t.Add(-39*time.Minute).Unix(), t.Add(-38*time.Minute).Unix(), t.Add(-28*time.Minute).Unix())
-	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 0)", 146, "build:linux", StatusSucceeded, t.Add(-16*time.Minute).Unix(), t.Add(-16*time.Minute).Unix(), t.Add(-15*time.Minute).Unix(), t.Add(-5*time.Minute).Unix())
-	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,windows', 0)", 146, "build:windows", StatusSucceeded, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-119*time.Minute).Unix(), t.Add(-107*time.Minute).Unix())
-	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 0)", 146, "test:linux", StatusCancelled, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-117*time.Minute).Unix(), t.Add(-116*time.Minute).Unix())
-	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 0)", 146, "test:linux", StatusStarted, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-4*time.Minute).Unix(), nil)
-	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,windows', 0)", 146, "test:windows", StatusSucceeded, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-107*time.Minute).Unix(), t.Add(-88*time.Minute).Unix())
-	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,macos', 0)", 146, "build:macos", StatusCreated, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), nil, nil)
-	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,macos', 0)", 146, "test:macos", StatusCreated, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), nil, nil)
-	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 0)", 146, "deploy", StatusCreated, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), nil, nil)
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 2, 0)", 146, "prepare", StatusSucceeded, t.Add(-134*time.Minute).Unix(), t.Add(-134*time.Minute).Unix(), t.Add(-133*time.Minute).Unix(), t.Add(-132*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 2, 1)", 146, "build:linux", StatusFailed, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-128*time.Minute).Unix(), t.Add(-118*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 2, 1)", 146, "build:linux", StatusFailed, t.Add(-108*time.Minute).Unix(), t.Add(-108*time.Minute).Unix(), t.Add(-107*time.Minute).Unix(), t.Add(-97*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 2, 1)", 146, "build:linux", StatusFailed, t.Add(-85*time.Minute).Unix(), t.Add(-85*time.Minute).Unix(), t.Add(-84*time.Minute).Unix(), t.Add(-74*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 2, 1)", 146, "build:linux", StatusFailed, t.Add(-62*time.Minute).Unix(), t.Add(-62*time.Minute).Unix(), t.Add(-61*time.Minute).Unix(), t.Add(-51*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 2, 1)", 146, "build:linux", StatusFailed, t.Add(-39*time.Minute).Unix(), t.Add(-39*time.Minute).Unix(), t.Add(-38*time.Minute).Unix(), t.Add(-28*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 2, 0)", 146, "build:linux", StatusSucceeded, t.Add(-16*time.Minute).Unix(), t.Add(-16*time.Minute).Unix(), t.Add(-15*time.Minute).Unix(), t.Add(-5*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,windows', 1, 0)", 146, "build:windows", StatusSucceeded, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-119*time.Minute).Unix(), t.Add(-107*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', NULL, 0)", 146, "test:linux", StatusCancelled, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-117*time.Minute).Unix(), t.Add(-116*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', 2, 0)", 146, "test:linux", StatusStarted, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-4*time.Minute).Unix(), nil)
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,windows', 1, 0)", 146, "test:windows", StatusSucceeded, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-107*time.Minute).Unix(), t.Add(-88*time.Minute).Unix())
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,macos', NULL, 0)", 146, "build:macos", StatusCreated, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), nil, nil)
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,macos', NULL, 0)", 146, "test:macos", StatusCreated, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), nil, nil)
+	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, 'docker,linux', NULL, 0)", 146, "deploy", StatusCreated, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), nil, nil)
 
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 2, 'version', 'v1.0.0', ?)", t.Unix())
 	return tx.Commit()
