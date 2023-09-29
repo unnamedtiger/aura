@@ -159,6 +159,7 @@ func findEntityOrCollection(table string, projectId int64, key string, val strin
 	}
 	if rows.Next() {
 		entity, err := ScanEntityOrCollection(rows)
+		rows.Close()
 		if err != nil {
 			return EntityOrCollection{}, err
 		}
@@ -236,6 +237,7 @@ func FindProjectBySlug(slug string) (Project, error) {
 	}
 	if rows.Next() {
 		project, err := ScanProject(rows)
+		rows.Close()
 		if err != nil {
 			return Project{}, err
 		}
@@ -275,6 +277,7 @@ func LoadEntity(id int64) (EntityOrCollection, error) {
 	}
 	if rows.Next() {
 		entity, err := ScanEntityOrCollection(rows)
+		rows.Close()
 		if err != nil {
 			return EntityOrCollection{}, err
 		}
@@ -290,6 +293,7 @@ func LoadJob(id int64) (Job, error) {
 	}
 	if rows.Next() {
 		job, err := ScanJob(rows)
+		rows.Close()
 		if err != nil {
 			return Job{}, err
 		}
@@ -305,6 +309,7 @@ func LoadProject(id int64) (Project, error) {
 	}
 	if rows.Next() {
 		project, err := ScanProject(rows)
+		rows.Close()
 		if err != nil {
 			return Project{}, err
 		}
