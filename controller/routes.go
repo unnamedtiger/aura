@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -153,24 +152,24 @@ func RouteProjectKey(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	limit := 10
-	entityList, err := FindEntities(project.Id, entityKey, before, int64(limit+1))
+	eocList, err := FindEntitiesOrCollections(project.Id, entityKey, before, int64(limit+1))
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		log.Println(err)
 		return
 	}
-	more := len(entityList) > limit
-	if len(entityList) > limit {
-		entityList = entityList[:limit]
+	more := len(eocList) > limit
+	if len(eocList) > limit {
+		eocList = eocList[:limit]
 	}
 
 	older := int64(0)
 	if more {
-		older = entityList[len(entityList)-1].Created.Unix()
+		older = eocList[len(eocList)-1].Created.Unix()
 	}
 
 	type data struct {
-		Entities    []Entity
+		Entities    []EntityOrCollection
 		EntityKey   string
 		Older       int64
 		ProjectName string
@@ -178,7 +177,7 @@ func RouteProjectKey(w http.ResponseWriter, r *http.Request) {
 		Title       string
 	}
 	title := fmt.Sprintf("%s / %s", project.Name, entityKey)
-	d := data{Entities: entityList, EntityKey: entityKey, Older: older, ProjectName: project.Name, ProjectSlug: project.Slug, Title: title}
+	d := data{Entities: eocList, EntityKey: entityKey, Older: older, ProjectName: project.Name, ProjectSlug: project.Slug, Title: title}
 	err = templates.ExecuteTemplate(w, "projectKey.html", d)
 	if err != nil {
 		log.Println(err)
@@ -217,15 +216,73 @@ func RouteProjectKeyVal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	entity, err := FindEntity(project.Id, entityKey, entityVal)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	} else if err == nil {
+		RouteProjectKeyValEntity(w, r, project, entity)
+		return
+	}
+	collection, err := FindCollection(project.Id, entityKey, entityVal)
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	} else if err == nil {
+		RouteProjectKeyValCollection(w, r, project, collection)
+		return
+	}
+	http.Error(w, "not found", http.StatusNotFound)
+}
+
+func RouteProjectKeyValCollection(w http.ResponseWriter, r *http.Request, project Project, collection EntityOrCollection) {
+	var err error
+	query := r.URL.Query()
+	before := int64(0)
+	if query.Has("before") {
+		beforeString := query.Get("before")
+		before, err = strconv.ParseInt(beforeString, 10, 64)
+		if err != nil {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
+	}
+	limit := 10
+	eocList, err := FindEntitiesInCollection(collection.Id, before, int64(limit+1))
+	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		log.Println(err)
 		return
 	}
+	more := len(eocList) > limit
+	if len(eocList) > limit {
+		eocList = eocList[:limit]
+	}
+
+	older := int64(0)
+	if more {
+		older = eocList[len(eocList)-1].Created.Unix()
+	}
+
+	type data struct {
+		Entities      []EntityOrCollection
+		CollectionKey string
+		CollectionVal string
+		Older         int64
+		ProjectName   string
+		ProjectSlug   string
+		Title         string
+	}
+	title := fmt.Sprintf("%s / %s / %s", project.Name, collection.Key, collection.Val)
+	d := data{Entities: eocList, CollectionKey: collection.Key, CollectionVal: collection.Val, Older: older, ProjectName: project.Name, ProjectSlug: project.Slug, Title: title}
+	err = templates.ExecuteTemplate(w, "projectKeyValCollection.html", d)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func RouteProjectKeyValEntity(w http.ResponseWriter, r *http.Request, project Project, entity EntityOrCollection) {
 	jobs, err := FindJobs(entity.Id)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -287,9 +344,9 @@ func RouteProjectKeyVal(w http.ResponseWriter, r *http.Request) {
 		ProjectSlug string
 		Title       string
 	}
-	title := fmt.Sprintf("%s / %s / %s", project.Name, entityKey, entityVal)
-	d := data{EntityKey: entityKey, EntityVal: entityVal, Jobs: dataJobs, JobsHistory: dataJobsHistory, JobsIndexes: dataJobsIndexes, ProjectName: project.Name, ProjectSlug: project.Slug, Title: title}
-	err = templates.ExecuteTemplate(w, "projectKeyVal.html", d)
+	title := fmt.Sprintf("%s / %s / %s", project.Name, entity.Key, entity.Val)
+	d := data{EntityKey: entity.Key, EntityVal: entity.Val, Jobs: dataJobs, JobsHistory: dataJobsHistory, JobsIndexes: dataJobsIndexes, ProjectName: project.Name, ProjectSlug: project.Slug, Title: title}
+	err = templates.ExecuteTemplate(w, "projectKeyValEntity.html", d)
 	if err != nil {
 		log.Println(err)
 	}
@@ -311,32 +368,31 @@ func RouteProjectMain(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	entityKeys, err := FindEntityKeysByProjectId(project.Id)
+	eocKeys, err := FindEntityOrCollectionKeysByProjectId(project.Id)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		log.Println(err)
 		return
 	}
-	sort.Strings(entityKeys)
-	entities := map[string][]Entity{}
-	entityMore := map[string]bool{}
+	eocs := map[string][]EntityOrCollection{}
+	eocMore := map[string]bool{}
 	limit := 10
-	for _, entityKey := range entityKeys {
-		entityList, err := FindEntities(project.Id, entityKey, 0, int64(limit+1))
+	for _, eocKey := range eocKeys {
+		eocList, err := FindEntitiesOrCollections(project.Id, eocKey, 0, int64(limit+1))
 		if err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			log.Println(err)
 			return
 		}
-		entityMore[entityKey] = len(entityList) > limit
-		if len(entityList) > limit {
-			entityList = entityList[:limit]
+		eocMore[eocKey] = len(eocList) > limit
+		if len(eocList) > limit {
+			eocList = eocList[:limit]
 		}
-		entities[entityKey] = entityList
+		eocs[eocKey] = eocList
 	}
 
 	type data struct {
-		Entities    map[string][]Entity
+		Entities    map[string][]EntityOrCollection
 		EntityKeys  []string
 		EntityMore  map[string]bool
 		ProjectName string
@@ -344,7 +400,7 @@ func RouteProjectMain(w http.ResponseWriter, r *http.Request) {
 		Title       string
 	}
 	title := project.Name
-	d := data{Entities: entities, EntityKeys: entityKeys, EntityMore: entityMore, ProjectName: project.Name, ProjectSlug: project.Slug, Title: title}
+	d := data{Entities: eocs, EntityKeys: eocKeys, EntityMore: eocMore, ProjectName: project.Name, ProjectSlug: project.Slug, Title: title}
 	err = templates.ExecuteTemplate(w, "project.html", d)
 	if err != nil {
 		log.Println(err)

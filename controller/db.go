@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"sort"
 	"time"
 )
 
@@ -38,7 +39,7 @@ func jobStatus(status int) string {
 	}
 }
 
-type Entity struct {
+type EntityOrCollection struct {
 	Id        int64
 	ProjectId int64
 	Key       string
@@ -63,47 +64,12 @@ type Project struct {
 	Slug string
 }
 
-func FindEntities(projectId int64, key string, before int64, limit int64) ([]Entity, error) {
-	query := "SELECT id, projectId, key, val, created FROM entities WHERE projectId = ? AND key = ? "
-	args := []any{projectId, key}
-	if before > 0 {
-		query += "AND created < ? "
-		args = append(args, before)
-	}
-	query += "ORDER BY created DESC LIMIT ?"
-	args = append(args, limit)
-	rows, err := db.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	results := []Entity{}
-	for rows.Next() {
-		entity, err := ScanEntity(rows)
-		if err != nil {
-			return nil, err
-		}
-		results = append(results, entity)
-	}
-	return results, nil
+func FindCollection(projectId int64, key string, val string) (EntityOrCollection, error) {
+	return findEntityOrCollection("collections", projectId, key, val)
 }
 
-func FindEntity(projectId int64, key string, val string) (Entity, error) {
-	rows, err := db.Query("SELECT id, projectId, key, val, created FROM entities WHERE projectId = ? AND key = ? AND val = ?", projectId, key, val)
-	if err != nil {
-		return Entity{}, err
-	}
-	if rows.Next() {
-		entity, err := ScanEntity(rows)
-		if err != nil {
-			return Entity{}, err
-		}
-		return entity, nil
-	}
-	return Entity{}, ErrNotFound
-}
-
-func FindEntityKeysByProjectId(projectId int64) ([]string, error) {
-	rows, err := db.Query("SELECT DISTINCT key FROM entities WHERE projectId = ?", projectId)
+func FindCollectionKeysByProjectId(projectId int64) ([]string, error) {
+	rows, err := db.Query("SELECT DISTINCT key FROM collections WHERE projectId = ? ORDER BY key ASC", projectId)
 	if err != nil {
 		return nil, err
 	}
@@ -117,6 +83,134 @@ func FindEntityKeysByProjectId(projectId int64) ([]string, error) {
 		results = append(results, key.String)
 	}
 	return results, nil
+}
+
+func FindEntitiesInCollection(collectionId int64, before int64, limit int64) ([]EntityOrCollection, error) {
+	query := "SELECT entities.id, entities.projectId, entities.key, entities.val, entities.created FROM entities INNER JOIN collectionsEntities on entities.id = collectionsEntities.entityId WHERE collectionsEntities.collectionId = ? "
+	args := []any{collectionId}
+	if before > 0 {
+		query += "AND created < ? "
+		args = append(args, before)
+	}
+	query += "ORDER BY created DESC LIMIT ?"
+	args = append(args, limit)
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	results := []EntityOrCollection{}
+	for rows.Next() {
+		entity, err := ScanEntityOrCollection(rows)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, entity)
+	}
+	return results, nil
+}
+
+func findEntitiesOrCollections(table string, projectId int64, key string, before int64, limit int64) ([]EntityOrCollection, error) {
+	query := "SELECT id, projectId, key, val, created FROM " + table + " WHERE projectId = ? AND key = ? "
+	args := []any{projectId, key}
+	if before > 0 {
+		query += "AND created < ? "
+		args = append(args, before)
+	}
+	query += "ORDER BY created DESC LIMIT ?"
+	args = append(args, limit)
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	results := []EntityOrCollection{}
+	for rows.Next() {
+		entity, err := ScanEntityOrCollection(rows)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, entity)
+	}
+	return results, nil
+}
+
+func FindEntitiesOrCollections(projectId int64, key string, before int64, limit int64) ([]EntityOrCollection, error) {
+	entities, err := findEntitiesOrCollections("entities", projectId, key, before, limit)
+	if err != nil {
+		return nil, err
+	}
+	if len(entities) > 0 {
+		return entities, nil
+	}
+	collections, err := findEntitiesOrCollections("collections", projectId, key, before, limit)
+	if err != nil {
+		return nil, err
+	}
+	return collections, nil
+}
+
+func FindEntity(projectId int64, key string, val string) (EntityOrCollection, error) {
+	return findEntityOrCollection("entities", projectId, key, val)
+}
+
+func findEntityOrCollection(table string, projectId int64, key string, val string) (EntityOrCollection, error) {
+	rows, err := db.Query("SELECT id, projectId, key, val, created FROM "+table+" WHERE projectId = ? AND key = ? AND val = ?", projectId, key, val)
+	if err != nil {
+		return EntityOrCollection{}, err
+	}
+	if rows.Next() {
+		entity, err := ScanEntityOrCollection(rows)
+		if err != nil {
+			return EntityOrCollection{}, err
+		}
+		return entity, nil
+	}
+	return EntityOrCollection{}, ErrNotFound
+}
+
+func FindEntityKeysByProjectId(projectId int64) ([]string, error) {
+	rows, err := db.Query("SELECT DISTINCT key FROM entities WHERE projectId = ? ORDER BY key ASC", projectId)
+	if err != nil {
+		return nil, err
+	}
+	results := []string{}
+	for rows.Next() {
+		var key sql.NullString
+		err := rows.Scan(&key)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, key.String)
+	}
+	return results, nil
+}
+
+func FindEntityOrCollectionKeysByProjectId(projectId int64) ([]string, error) {
+	entityKeys, err := FindEntityKeysByProjectId(projectId)
+	if err != nil {
+		return nil, err
+	}
+	collectionKeys, err := FindCollectionKeysByProjectId(projectId)
+	if err != nil {
+		return nil, err
+	}
+	if len(entityKeys) == 0 {
+		return collectionKeys, nil
+	} else if len(collectionKeys) == 0 {
+		return entityKeys, nil
+	}
+	keyMap := map[string]bool{}
+	for _, k := range entityKeys {
+		keyMap[k] = true
+	}
+	for _, k := range collectionKeys {
+		keyMap[k] = true
+	}
+	keys := make([]string, 0, len(keyMap))
+	for k := range keyMap {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys, nil
 }
 
 func FindJobs(entityId int64) ([]Job, error) {
@@ -174,19 +268,19 @@ func FindQueuedJobs(before int64, limit int64) ([]Job, error) {
 	return results, nil
 }
 
-func LoadEntity(id int64) (Entity, error) {
+func LoadEntity(id int64) (EntityOrCollection, error) {
 	rows, err := db.Query("SELECT id, projectId, key, val, created FROM entities WHERE id = ?", id)
 	if err != nil {
-		return Entity{}, err
+		return EntityOrCollection{}, err
 	}
 	if rows.Next() {
-		entity, err := ScanEntity(rows)
+		entity, err := ScanEntityOrCollection(rows)
 		if err != nil {
-			return Entity{}, err
+			return EntityOrCollection{}, err
 		}
 		return entity, nil
 	}
-	return Entity{}, ErrNotFound
+	return EntityOrCollection{}, ErrNotFound
 }
 
 func LoadJob(id int64) (Job, error) {
@@ -235,7 +329,7 @@ func LoadProjects() ([]Project, error) {
 	return results, nil
 }
 
-func ScanEntity(rows *sql.Rows) (Entity, error) {
+func ScanEntityOrCollection(rows *sql.Rows) (EntityOrCollection, error) {
 	var id sql.NullInt64
 	var projectId sql.NullInt64
 	var key sql.NullString
@@ -243,10 +337,10 @@ func ScanEntity(rows *sql.Rows) (Entity, error) {
 	var createdTimestamp sql.NullInt64
 	err := rows.Scan(&id, &projectId, &key, &val, &createdTimestamp)
 	if err != nil {
-		return Entity{}, err
+		return EntityOrCollection{}, err
 	}
 	created := time.Unix(createdTimestamp.Int64, 0)
-	return Entity{Id: id.Int64, ProjectId: projectId.Int64, Key: key.String, Val: val.String, Created: created}, nil
+	return EntityOrCollection{Id: id.Int64, ProjectId: projectId.Int64, Key: key.String, Val: val.String, Created: created}, nil
 }
 
 func ScanJob(rows *sql.Rows) (Job, error) {
@@ -306,6 +400,8 @@ func InitializeDatabase() error {
 	}
 	tryExec(tx, "CREATE TABLE projects (id INTEGER PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL)")
 	tryExec(tx, "CREATE TABLE entities (id INTEGER PRIMARY KEY, projectId INTEGER NOT NULL, key TEXT NOT NULL, val TEXT NOT NULL, created INTEGER NOT NULL, FOREIGN KEY (projectId) REFERENCES projects(id))")
+	tryExec(tx, "CREATE TABLE collections (id INTEGER PRIMARY KEY, projectId INTEGER NOT NULL, key TEXT NOT NULL, val TEXT NOT NULL, created INTEGER NOT NULL, FOREIGN KEY (projectId) REFERENCES projects(id))")
+	tryExec(tx, "CREATE TABLE collectionsEntities (id INTEGER PRIMARY KEY, collectionId INTEGER NOT NULL, entityId INTEGER NOT NULL, FOREIGN KEY (collectionId) REFERENCES collections(id), FOREIGN KEY (entityId) REFERENCES entities(id))")
 	tryExec(tx, "CREATE TABLE jobs (id INTEGER PRIMARY KEY, entityId INTEGER NOT NULL, name TEXT NOT NULL, status INTEGER NOT NULL, created INTEGER NOT NULL, earliestStart INTEGER NOT NULL, started INTEGER, ended INTEGER, FOREIGN KEY (entityId) REFERENCES entities(id))")
 	// TODO: job tag
 	// TODO: table for preceding jobs
@@ -341,9 +437,17 @@ func FillDatabaseWithDemoData() error {
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'commit', '100b7037fa04ee41646f7bc1604b2fad881d58b8f519778c0c0debd05895e3a106', ?)", t.Add(-375*time.Minute).Unix())
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'commit', '103b1fa64a689e780acb629ee8f4637810d0756b1462cc1d512748c07abc4515a8', ?)", t.Add(-255*time.Minute).Unix())
 	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'commit', '102dd7bb0ad4fa62b01c406b0f9c4cb734bb62f9c9c0f3c5de8bdecff59d1fdd1b', ?)", t.Add(-135*time.Minute).Unix())
-	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '1', ?)", t.Add(-168*time.Hour).Unix())
-	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '2', ?)", t.Add(-166*time.Hour).Unix())
-	tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '3', ?)", t.Add(-120*time.Hour).Unix())
+	tryExec(tx, "INSERT INTO collections (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '1', ?)", t.Add(-168*time.Hour).Unix())
+	tryExec(tx, "INSERT INTO collections (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '2', ?)", t.Add(-166*time.Hour).Unix())
+	tryExec(tx, "INSERT INTO collections (id, projectId, key, val, created) VALUES (NULL, 3, 'mr', '3', ?)", t.Add(-120*time.Hour).Unix())
+	tryExec(tx, "INSERT INTO collectionsEntities (id, collectionId, entityId) VALUES (NULL, 1, 136)")
+	tryExec(tx, "INSERT INTO collectionsEntities (id, collectionId, entityId) VALUES (NULL, 1, 137)")
+	tryExec(tx, "INSERT INTO collectionsEntities (id, collectionId, entityId) VALUES (NULL, 1, 138)")
+	tryExec(tx, "INSERT INTO collectionsEntities (id, collectionId, entityId) VALUES (NULL, 2, 140)")
+	tryExec(tx, "INSERT INTO collectionsEntities (id, collectionId, entityId) VALUES (NULL, 2, 141)")
+	tryExec(tx, "INSERT INTO collectionsEntities (id, collectionId, entityId) VALUES (NULL, 2, 142)")
+	tryExec(tx, "INSERT INTO collectionsEntities (id, collectionId, entityId) VALUES (NULL, 3, 144)")
+	tryExec(tx, "INSERT INTO collectionsEntities (id, collectionId, entityId) VALUES (NULL, 3, 145)")
 	for i := 0; i < 10; i++ {
 		dt := t.Add(time.Duration(-(135 + i*120)) * time.Minute)
 		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?)", 136+i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(630*time.Second).Unix())
@@ -351,7 +455,7 @@ func FillDatabaseWithDemoData() error {
 	for i := 0; i < 11; i++ {
 		dt := t.Add(time.Duration(-(11-i)*24) * time.Hour)
 		tryExec(tx, "INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, 3, 'nightly', ?, ?)", dt.Format("2006-01-02"), dt.Unix())
-		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?)", 150+i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(630*time.Second).Unix())
+		tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, 'build', ?, ?, ?, ?, ?)", 147+i, StatusSucceeded, dt.Unix(), dt.Unix(), dt.Add(30*time.Second).Unix(), dt.Add(630*time.Second).Unix())
 	}
 	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "prepare", StatusSucceeded, t.Add(-134*time.Minute).Unix(), t.Add(-134*time.Minute).Unix(), t.Add(-133*time.Minute).Unix(), t.Add(-132*time.Minute).Unix())
 	tryExec(tx, "INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)", 146, "build:linux", StatusFailed, t.Add(-132*time.Minute).Unix(), t.Add(-132*time.Minute).Unix(), t.Add(-128*time.Minute).Unix(), t.Add(-118*time.Minute).Unix())

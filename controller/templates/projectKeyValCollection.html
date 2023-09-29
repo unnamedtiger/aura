@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+{{ template "headers" . }}
+</head>
+<body>
+    <div class="menubar">
+        <a class="logo" href="/"><img src="/static/logo.png" alt="Aura logo" /></a>
+        <a class="item" href="/p/{{ .ProjectSlug }}">{{ .ProjectName }}</a>
+        <a class="item" href="/p/{{ .ProjectSlug }}/{{ .CollectionKey }}">{{ .CollectionKey }}</a>
+        <a class="item" href="/p/{{ .ProjectSlug }}/{{ .CollectionKey }}/{{ .CollectionVal }}">{{ .CollectionVal }}</a>
+    </div>
+    <div class="container">
+        {{ if .Entities }}
+        {{ range $item := .Entities }}
+        <div class="item"><b><a href="/p/{{ $.ProjectSlug }}/{{ $item.Key }}">{{ $item.Key }}</a> <a href="/p/{{ $.ProjectSlug }}/{{ $item.Key }}/{{ $item.Val }}">{{ $item.Val }}</a></b> created {{ $item.Created }}</div>
+        {{ end }}
+        {{ if gt .Older 0 }}
+        <div class="button" style="margin: 0.5em 0;"><a href="/p/{{ .ProjectSlug }}/{{ .CollectionKey }}/{{ .CollectionVal }}?before={{ .Older }}">Older &gt;</a></div>
+        {{ end }}
+        {{ else }}
+        <i>No entities found.</i>
+        {{ end }}
+    </div>
+</body>
+</html>
