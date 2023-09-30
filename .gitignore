@@ -1,2 +1,4 @@
 controller/controller.exe
 controller/*.db
+runner-native/config.json
+runner-native/runner-native.exe
