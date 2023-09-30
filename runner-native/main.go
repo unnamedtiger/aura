@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"time"
 
 	"github.com/google/shlex"
@@ -91,25 +92,38 @@ func runJob(cfg Config, job Job) {
 	out := []byte{}
 	parts, err := shlex.Split(job.Cmd)
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
 		exitCode = -1
 	} else {
 		partsArgs := []string{}
 		if len(parts) > 1 {
 			partsArgs = parts[1:]
 		}
-		cmd := exec.Command(parts[0], partsArgs...)
-		out, err = cmd.CombinedOutput()
+		wd := path.Join("w", fmt.Sprintf("%d", job.Id))
+		err = os.MkdirAll(wd, os.ModePerm)
 		if err != nil {
-			exitError, ok := err.(*exec.ExitError)
-			if ok {
-				exitCode = exitError.ExitCode()
-			} else {
-				log.Fatalln(err)
+			log.Println(err)
+			exitCode = -1
+		} else {
+			cmd := exec.Command(parts[0], partsArgs...)
+			cmd.Dir = wd
+			out, err = cmd.CombinedOutput()
+			if err != nil {
+				exitError, ok := err.(*exec.ExitError)
+				if ok {
+					exitCode = exitError.ExitCode()
+				} else {
+					log.Println(err)
+					exitCode = -1
+				}
+			}
+			log.Println(string(out))
+			err = os.RemoveAll(wd)
+			if err != nil {
+				log.Println(err)
 				exitCode = -1
 			}
 		}
-		log.Println(string(out))
 	}
 
 	req := Results{Name: cfg.Name, Id: job.Id, ExitCode: int64(exitCode)}
