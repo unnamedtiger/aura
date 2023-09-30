@@ -218,15 +218,15 @@ func RouteApiRunner(w http.ResponseWriter, r *http.Request) {
 	candidates := []int64{}
 	for _, tag := range req.Tags {
 		tagCheckins[tag] = t
-		jobIds, err := FindJobsForRunner(tag, int64(req.Limit-len(candidates)), t)
-		if err != nil {
-			http.Error(w, "internal server error", http.StatusInternalServerError)
-			log.Println(err)
-			return
-		}
-		candidates = append(candidates, jobIds...)
-		if len(candidates) >= req.Limit {
-			break
+		limit := int64(req.Limit - len(candidates))
+		if limit > 0 {
+			jobIds, err := FindJobsForRunner(tag, limit, t)
+			if err != nil {
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				log.Println(err)
+				return
+			}
+			candidates = append(candidates, jobIds...)
 		}
 	}
 	jobs := []Job{}
