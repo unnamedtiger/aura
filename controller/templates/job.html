@@ -24,6 +24,7 @@
             <div class="item">took {{ .JobDuration }}</div>
             {{ end }}
             <hr/>
+            <div class="item"><b>Command</b> {{ .Job.Cmd }}</div>
             <div class="item"><b>Tag</b> {{ .Job.Tag }}</div>
             {{ if or (or (eq .JobStatus "started") (eq .JobStatus "succeeded")) (eq .JobStatus "failed") }}
             <div class="item"><b>Runner</b> {{ .Runner.Name }}</div>
