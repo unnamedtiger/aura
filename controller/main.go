@@ -60,6 +60,7 @@ func main() {
 	router.Handle("/static/", http.FileServer(http.FS(staticData)))
 	router.HandleFunc("/api/job", RouteApiJob)
 	router.HandleFunc("/api/runner", RouteApiRunner)
+	router.HandleFunc("/api/storage/", RouteApiStorage)
 	router.HandleFunc("/api/submit", RouteApiSubmit)
 	router.HandleFunc("/j/", RouteJob)
 	router.HandleFunc("/p/", RouteProject)

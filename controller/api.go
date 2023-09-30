@@ -6,6 +6,9 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"path"
+	"strings"
 	"time"
 )
 
@@ -247,6 +250,36 @@ func RouteApiRunner(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respond(w, http.StatusOK, jobs)
+}
+
+func RouteApiStorage(w http.ResponseWriter, r *http.Request) {
+	p := strings.TrimPrefix(r.URL.Path, "/api/storage/")
+	p = path.Join("artifacts", p)
+	err := os.MkdirAll(path.Dir(p), os.ModePerm)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	file, err := os.Create(p)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	_, err = io.Copy(file, r.Body)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	err = file.Close()
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	respond(w, http.StatusOK, ApiResponse{Code: http.StatusOK, Message: "saved file"})
 }
 
 func RouteApiSubmit(w http.ResponseWriter, r *http.Request) {

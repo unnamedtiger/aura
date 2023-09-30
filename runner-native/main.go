@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -117,6 +118,15 @@ func runJob(cfg Config, job Job) {
 		log.Fatalln(err)
 	}
 	_, err = http.Post(cfg.Controller+"/api/job", "application/json", bytes.NewBuffer(reqData))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	logUploadReq, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/api/storage/%d/log", cfg.Controller, job.Id), bytes.NewBuffer(out))
+	if err != nil {
+		log.Fatalln(err)
+	}
+	_, err = http.DefaultClient.Do(logUploadReq)
 	if err != nil {
 		log.Fatalln(err)
 	}
