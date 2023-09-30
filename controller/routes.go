@@ -24,6 +24,11 @@ var templateData embed.FS
 
 var templates *template.Template
 
+func buildTimer(t time.Time) template.HTML {
+	tfmt := t.Format("2006-01-02 15:04:05")
+	return template.HTML(fmt.Sprintf("<span class=\"timer\" data-timer=\"%d\" title=\"%s\">%s</span>", t.Unix(), tfmt, tfmt))
+}
+
 func RouteRoot(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.Error(w, "not found", http.StatusNotFound)

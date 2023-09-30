@@ -15,12 +15,12 @@
             <div style="margin: 0.5em 0;">
                 {{ template "jobitem" . }}
             </div>
-            <div class="item">created {{ .Job.Created }}</div>
+            <div class="item">created {{ buildTimer .Job.Created }}</div>
             {{ if or (or (eq .JobStatus "started") (eq .JobStatus "succeeded")) (eq .JobStatus "failed") }}
-            <div class="item">started {{ .Job.Started }}</div>
+            <div class="item">started {{ buildTimer .Job.Started }}</div>
             {{ end }}
             {{ if or (eq .JobStatus "succeeded") (eq .JobStatus "failed") }}
-            <div class="item">finished {{ .Job.Ended }}</div>
+            <div class="item">finished {{ buildTimer .Job.Ended }}</div>
             <div class="item">took {{ .JobDuration }}</div>
             {{ end }}
             <hr/>
@@ -43,7 +43,7 @@
             {{ end }}
             {{ end }}
             {{ if .WaitingEarliestStart }}
-            <div><b>Waiting until</b> {{ .Job.EarliestStart }}</div>
+            <div><b>Waiting until start</b> {{ buildTimer .Job.EarliestStart }}</div>
             {{ end }}
             {{ if or (eq .JobStatus "succeeded") (eq .JobStatus "failed") }}
             {{ if .Log }}

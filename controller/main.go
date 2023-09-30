@@ -54,7 +54,10 @@ func main() {
 
 	runnerCheckins = make(map[string]time.Time)
 	tagCheckins = make(map[string]time.Time)
-	templates = template.Must(template.New("pages").ParseFS(templateData, "templates/*"))
+	templateFuncs := template.FuncMap{
+		"buildTimer": buildTimer,
+	}
+	templates = template.Must(template.New("pages").Funcs(templateFuncs).ParseFS(templateData, "templates/*"))
 
 	router := http.NewServeMux()
 	router.Handle("/static/", http.FileServer(http.FS(staticData)))

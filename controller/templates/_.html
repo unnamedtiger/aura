@@ -13,6 +13,38 @@
 <meta name="msapplication-TileColor" content="#9f00a7">
 <meta name="msapplication-config" content="/static/browserconfig.xml">
 <meta name="theme-color" content="#ffffff">
+<script>
+    function updateTimers() {
+        const t = Math.floor(Date.now() / 1000);
+        const elems = document.querySelectorAll("[data-timer]");
+        elems.forEach(elem => {
+            let t2 = elem.getAttribute("data-timer") - t;
+            const neg = t2 < 0;
+            t2 = Math.abs(t2);
+            let txt = "";
+            const d = Math.floor(t2 / 86400);
+            const h = Math.floor((t2 % 86400) / 3600);
+            const m = Math.floor((t2 % 3600) / 60);
+            const s = Math.floor(t2 % 60);
+            if (d > 0) {
+                txt = d.toString() + "d" + h.toString() + "h";
+            } else if (h > 0) {
+                txt = h.toString() + "h" + m.toString() + "m";
+            } else if (m > 0) {
+                txt = m.toString() + "m" + s.toString() + "s";
+            } else {
+                txt = s.toString() + "s";
+            }
+            if (neg) {
+                elem.innerHTML = txt + " ago";
+            } else {
+                elem.innerHTML = "in " + txt;
+            }
+        });
+        setTimeout(updateTimers, 5000);
+    }
+    window.onload = updateTimers;
+</script>
 {{ end }}
 
 {{ define "jobitem" }}
@@ -22,13 +54,13 @@
         <span class="title"><a href="/j/{{ .Job.Id }}">{{ .Job.Name }}</a></span>
         {{ if not .Minimal }}
         {{ if eq .JobStatus "created" }}
-        <span class="small">created {{ .Job.Created }}</span>
+        <span class="small">created {{ buildTimer .Job.Created }}</span>
         {{ else if eq .JobStatus "started" }}
-        <span class="small">started {{ .Job.Started }}</span>
+        <span class="small">started {{ buildTimer .Job.Started }}</span>
         {{ else if eq .JobStatus "succeeded" }}
-        <span class="small">finished {{ .Job.Ended }}, took {{ .JobDuration }}</span>
+        <span class="small">finished {{ buildTimer .Job.Ended }}, took {{ .JobDuration }}</span>
         {{ else if eq .JobStatus "failed" }}
-        <span class="small">finished {{ .Job.Ended }}, took {{ .JobDuration }}</span>
+        <span class="small">finished {{ buildTimer .Job.Ended }}, took {{ .JobDuration }}</span>
         {{ end }}
         {{ end }}
     </div>

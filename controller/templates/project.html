@@ -15,7 +15,7 @@
             <h2>{{ $key }}</h2>
             {{ $items := index $.Entities $key }}
             {{ range $item := $items }}
-            <div class="item"><b><a href="/p/{{ $.ProjectSlug }}/{{ $key }}/{{ $item.Val }}">{{ $item.Val }}</a></b> created {{ $item.Created }}</div>
+            <div class="item"><b><a href="/p/{{ $.ProjectSlug }}/{{ $key }}/{{ $item.Val }}">{{ $item.Val }}</a></b> created {{ buildTimer $item.Created }}</div>
             {{ end }}
             {{ $more := index $.EntityMore $key }}
             {{ if $more }}

@@ -13,7 +13,7 @@
         <h2>Runners</h2>
         {{ if .Runners }}
         {{ range $item := .Runners }}
-        <div class="item"><b>{{ $item.Name }}</b> last check-in {{ $item.Date }}</div>
+        <div class="item"><b>{{ $item.Name }}</b> last check-in {{ buildTimer $item.Date }}</div>
         {{ end }}
         {{ else }}
         <i>No recently checked-in runners found.</i>
@@ -27,7 +27,7 @@
         <h2>Tags</h2>
         {{ if .Tags }}
         {{ range $item := .Tags }}
-        <div class="item"><b>{{ $item.Name }}</b> last check-in {{ $item.Date }}</div>
+        <div class="item"><b>{{ $item.Name }}</b> last check-in {{ buildTimer $item.Date }}</div>
         {{ end }}
         {{ else }}
         <i>No recently checked-in tags found.</i>
