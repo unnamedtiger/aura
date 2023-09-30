@@ -258,7 +258,7 @@ func FindJobs(entityId int64) ([]Job, error) {
 }
 
 func FindJobsForRunner(tag string, limit int64, now time.Time) ([]int64, error) {
-	rows, err := db.Query("SELECT DISTINCT jobs.id FROM jobs LEFT JOIN precedingJobs ON jobs.id = precedingJobs.newerJob WHERE precedingJobs.newerJob IS NULL AND jobs.tag = ? AND jobs.status = ? AND jobs.earliestStart >= ? ORDER BY jobs.created ASC LIMIT ?", tag, StatusCreated, now.Unix(), limit)
+	rows, err := db.Query("SELECT DISTINCT jobs.id FROM jobs LEFT JOIN precedingJobs ON jobs.id = precedingJobs.newerJob WHERE precedingJobs.newerJob IS NULL AND jobs.tag = ? AND jobs.status = ? AND jobs.earliestStart <= ? ORDER BY jobs.created ASC LIMIT ?", tag, StatusCreated, now.Unix(), limit)
 	if err != nil {
 		return nil, err
 	}
