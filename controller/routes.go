@@ -7,6 +7,8 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -112,12 +114,32 @@ func RouteJob(w http.ResponseWriter, r *http.Request) {
 		precedingDataJobs = append(precedingDataJobs, dataJob{Job: precedingJob, JobDuration: jobDuration, JobStatus: jobStatus(precedingJob.Status), Minimal: false})
 	}
 
+	logContent := ""
+	logFile := filepath.Join("artifacts", fmt.Sprintf("%d", job.Id), "log")
+	_, err = os.Stat(logFile)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+	} else {
+		bytes, err := os.ReadFile(logFile)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+		logContent = string(bytes)
+	}
+
 	type data struct {
 		EntityKey            string
 		EntityVal            string
 		Job                  Job
 		JobDuration          string
 		JobStatus            string
+		Log                  string
 		Minimal              bool
 		PrecedingJobs        []dataJob
 		ProjectName          string
@@ -127,7 +149,7 @@ func RouteJob(w http.ResponseWriter, r *http.Request) {
 		WaitingEarliestStart bool
 	}
 	title := fmt.Sprintf("Job #%d", jobId)
-	d := data{EntityKey: entity.Key, EntityVal: entity.Val, Job: job, JobDuration: jobDuration, JobStatus: jobStatus(job.Status), Minimal: true, PrecedingJobs: precedingDataJobs, ProjectName: project.Name, ProjectSlug: project.Slug, Runner: runner, Title: title, WaitingEarliestStart: job.EarliestStart.After(t)}
+	d := data{EntityKey: entity.Key, EntityVal: entity.Val, Job: job, JobDuration: jobDuration, JobStatus: jobStatus(job.Status), Log: logContent, Minimal: true, PrecedingJobs: precedingDataJobs, ProjectName: project.Name, ProjectSlug: project.Slug, Runner: runner, Title: title, WaitingEarliestStart: job.EarliestStart.After(t)}
 	err = templates.ExecuteTemplate(w, "job.html", d)
 	if err != nil {
 		log.Println(err)

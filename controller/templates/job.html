@@ -45,8 +45,13 @@
             {{ if .WaitingEarliestStart }}
             <div><b>Waiting until</b> {{ .Job.EarliestStart }}</div>
             {{ end }}
-            <!-- TODO -->
-            <pre></pre>
+            {{ if or (eq .JobStatus "succeeded") (eq .JobStatus "failed") }}
+            {{ if .Log }}
+            <pre>{{ .Log }}</pre>
+            {{ else }}
+            <i>No log available.</i>
+            {{ end }}
+            {{ end }}
         </div>
     </div>
 </body>
