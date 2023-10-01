@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/google/shlex"
@@ -29,6 +30,7 @@ type Request struct {
 type Job struct {
 	Id  int64
 	Cmd string
+	Env string
 }
 
 type Results struct {
@@ -107,6 +109,7 @@ func runJob(cfg Config, job Job) {
 		} else {
 			cmd := exec.Command(parts[0], partsArgs...)
 			cmd.Dir = wd
+			cmd.Env = strings.Split(job.Env, "\n")
 			out, err = cmd.CombinedOutput()
 			if err != nil {
 				exitError, ok := err.(*exec.ExitError)

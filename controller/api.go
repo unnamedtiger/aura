@@ -37,6 +37,7 @@ type SubmitRequest struct {
 	EntityVal string `json:"entityVal"`
 	Name      string `json:"name"`
 	Cmd       string `json:"cmd"`
+	Env       string `json:"env"`
 	Tag       string `json:"tag"`
 
 	PrecedingJobs []int64 `json:"precedingJobs"`
@@ -81,7 +82,7 @@ func ApiSubmit(req SubmitRequest) (int64, ApiResponse, error) {
 	if req.EarliestStart != nil {
 		earliestStart = time.Unix(*req.EarliestStart, 0)
 	}
-	jobId, err := CreateJob(entity.Id, req.Name, t, earliestStart, req.Cmd, req.Tag)
+	jobId, err := CreateJob(entity.Id, req.Name, t, earliestStart, req.Cmd, req.Env, req.Tag)
 	if err != nil {
 		return 0, ApiResponse{}, err
 	}
