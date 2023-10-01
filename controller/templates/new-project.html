@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+{{ template "headers" . }}
+</head>
+<body>
+    <div class="menubar">
+        <a class="logo" href="/"><img src="/static/logo.png" alt="Aura logo" /></a>
+        <a class="item" href="/queue">Job Queue</a>
+        <a class="item" href="/runners">Runner Status</a>
+    </div>
+    <div class="container">
+        <h2>Create New Project</h2>
+        <form method="POST">
+            <div>
+                <label for="name">Name</label>
+                <input name="name" id="name" value="" />
+            </div>
+            <div>
+                <label for="slug">Slug (URL friendly)</label>
+                <input name="slug" id="slug" value="" />
+            </div>
+            <div>
+                <button>Create</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

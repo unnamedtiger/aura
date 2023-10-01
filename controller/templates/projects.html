@@ -11,6 +11,7 @@
     </div>
     <div class="container">
         <h2>All Projects</h2>
+        <div class="button" style="margin-bottom: 0.5em;"><a href="/new-project">Create New Project &gt;</a></div>
         {{ if .Projects }}
         {{ range $project := .Projects }}
         <div class="item"><b><a href="/p/{{ $project.Slug }}">{{ $project.Name }}</a></b></div>
