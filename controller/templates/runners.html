@@ -11,12 +11,13 @@
     </div>
     <div class="container">
         <h2>Runners</h2>
+        <div class="button" style="margin-bottom: 0.5em;"><a href="/new-runner">Create New Runner &gt;</a></div>
         {{ if .Runners }}
         {{ range $item := .Runners }}
         <div class="item"><b>{{ $item.Name }}</b> last check-in {{ buildTimer $item.Date }}</div>
         {{ end }}
         {{ else }}
-        <i>No recently checked-in runners found.</i>
+        <div><i>No recently checked-in runners found.</i></div>
         {{ end }}
         {{ if .OfflineRunners }}
         <h2>Offline Runners</h2>
@@ -30,7 +31,7 @@
         <div class="item"><b>{{ $item.Name }}</b> last check-in {{ buildTimer $item.Date }}</div>
         {{ end }}
         {{ else }}
-        <i>No recently checked-in tags found.</i>
+        <div><i>No recently checked-in tags found.</i></div>
         {{ end }}
     </div>
 </body>

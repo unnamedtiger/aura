@@ -190,6 +190,34 @@ func RouteNewProject(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func RouteNewRunner(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		name := r.FormValue("name")
+		if !slugRegex.MatchString(name) {
+			http.Error(w, "invalid name", http.StatusBadRequest)
+			return
+		}
+		_, err := CreateRunner(name)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+		http.Redirect(w, r, "/runners", http.StatusFound)
+		return
+	}
+
+	type data struct {
+		Title string
+	}
+	title := "Create New Runner"
+	d := data{Title: title}
+	err := templates.ExecuteTemplate(w, "new-runner.html", d)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
 var slugRegex = regexp.MustCompile(`^[0-9A-Za-z-_:\.]{1,260}$`)
 
 func RouteProject(w http.ResponseWriter, r *http.Request) {

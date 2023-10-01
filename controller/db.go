@@ -99,6 +99,14 @@ func CreateProject(name string, slug string) (int64, error) {
 	return res.LastInsertId()
 }
 
+func CreateRunner(name string) (int64, error) {
+	res, err := db.Exec("INSERT INTO runners (id, name) VALUES (NULL, ?)", name)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
 func FindCollection(projectId int64, key string, val string) (EntityOrCollection, error) {
 	return findEntityOrCollection("collections", projectId, key, val)
 }

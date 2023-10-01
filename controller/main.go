@@ -67,6 +67,7 @@ func main() {
 	router.HandleFunc("/api/submit", RouteApiSubmit)
 	router.HandleFunc("/j/", RouteJob)
 	router.HandleFunc("/new-project", RouteNewProject)
+	router.HandleFunc("/new-runner", RouteNewRunner)
 	router.HandleFunc("/p/", RouteProject)
 	router.HandleFunc("/queue", RouteQueue)
 	router.HandleFunc("/runners", RouteRunners)
