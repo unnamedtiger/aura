@@ -50,11 +50,11 @@ Start the runner in this working directory.
 It should contact the controller, get no jobs to run, and then output `Sleeping...` and wait for a minute before trying again.
 Once you refresh the Runner Status page of the controller you'll see that your new runner is listed with a recent checkin and all tags you provided are also listed as checked-in recently.
 
-In the web interface click on the **A** logo in the top right and on New Project.
+In the web interface click on the **A** logo in the top left and on New Project.
 Give your project a name and URL slug and create it.
 Now you're ready to submit the first job.
 
-Prepare to `POST` some json to `/api/submit`.
+Prepare to `POST` some JSON to `/api/submit`.
 With [Curl](https://curl.se/) use the following command:
 
 ```sh
