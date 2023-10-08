@@ -137,7 +137,7 @@ func respond(w http.ResponseWriter, code int, data any) {
 
 func RouteApiJob(w http.ResponseWriter, r *http.Request) {
 	t := time.Now()
-	if r.Method != "POST" {
+	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -194,7 +194,7 @@ func handlePrecedingJobCompleted(jobId int64, status int, now time.Time) {
 
 func RouteApiRunner(w http.ResponseWriter, r *http.Request) {
 	t := time.Now()
-	if r.Method != "POST" {
+	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -254,6 +254,10 @@ func RouteApiRunner(w http.ResponseWriter, r *http.Request) {
 }
 
 func RouteApiStorage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	p := strings.TrimPrefix(r.URL.Path, "/api/storage/")
 	p = path.Join("artifacts", p)
 	err := os.MkdirAll(path.Dir(p), os.ModePerm)
@@ -284,7 +288,7 @@ func RouteApiStorage(w http.ResponseWriter, r *http.Request) {
 }
 
 func RouteApiSubmit(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
+	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
