@@ -99,8 +99,8 @@ func CreateProject(name string, slug string) (int64, error) {
 	return res.LastInsertId()
 }
 
-func CreateRunner(name string) (int64, error) {
-	res, err := db.Exec("INSERT INTO runners (id, name) VALUES (NULL, ?)", name)
+func CreateRunner(name string, auth []byte) (int64, error) {
+	res, err := db.Exec("INSERT INTO runners (id, name, auth) VALUES (NULL, ?, ?)", name, auth)
 	if err != nil {
 		return 0, err
 	}
@@ -602,7 +602,7 @@ func InitializeDatabase() error {
 	if err != nil {
 		return err
 	}
-	tryExec(tx, "CREATE TABLE runners (id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
+	tryExec(tx, "CREATE TABLE runners (id INTEGER PRIMARY KEY, name TEXT NOT NULL, auth BLOB NOT NULL)")
 	tryExec(tx, "CREATE TABLE projects (id INTEGER PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL)")
 	tryExec(tx, "CREATE TABLE entities (id INTEGER PRIMARY KEY, projectId INTEGER NOT NULL, key TEXT NOT NULL, val TEXT NOT NULL, created INTEGER NOT NULL, FOREIGN KEY (projectId) REFERENCES projects(id))")
 	tryExec(tx, "CREATE TABLE collections (id INTEGER PRIMARY KEY, projectId INTEGER NOT NULL, key TEXT NOT NULL, val TEXT NOT NULL, created INTEGER NOT NULL, FOREIGN KEY (projectId) REFERENCES projects(id))")
@@ -619,9 +619,21 @@ func FillDatabaseWithDemoData() error {
 		return err
 	}
 
-	tryExec(tx, "INSERT INTO RUNNERS (id, name) VALUES (NULL, 'buildbox-windows')")
-	tryExec(tx, "INSERT INTO RUNNERS (id, name) VALUES (NULL, 'buildbox-linux')")
-	tryExec(tx, "INSERT INTO RUNNERS (id, name) VALUES (NULL, 'buildbox-macos')")
+	authWindows, err := GenerateFromPassword("AURA_RUNNERKEY_buildbox-windows-0000000000000000000000000")
+	if err != nil {
+		return err
+	}
+	authLinux, err := GenerateFromPassword("AURA_RUNNERKEY_buildbox-linux-000000000000000000000000000")
+	if err != nil {
+		return err
+	}
+	authMacos, err := GenerateFromPassword("AURA_RUNNERKEY_buildbox-macos-000000000000000000000000000")
+	if err != nil {
+		return err
+	}
+	tryExec(tx, "INSERT INTO RUNNERS (id, name, auth) VALUES (NULL, ?, ?)", "buildbox-windows", authWindows)
+	tryExec(tx, "INSERT INTO RUNNERS (id, name, auth) VALUES (NULL, ?, ?)", "buildbox-linux", authLinux)
+	tryExec(tx, "INSERT INTO RUNNERS (id, name, auth) VALUES (NULL, ?, ?)", "buildbox-macos", authMacos)
 
 	tryExec(tx, "INSERT INTO projects (id, name, slug) VALUES (NULL, 'Colors', 'colors')")
 	tryExec(tx, "INSERT INTO projects (id, name, slug) VALUES (NULL, 'Darke', 'darke')")

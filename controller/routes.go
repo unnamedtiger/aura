@@ -197,13 +197,30 @@ func RouteNewRunner(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid name", http.StatusBadRequest)
 			return
 		}
-		_, err := CreateRunner(name)
+		pass, hash, err := GenerateRandom(PrefixRunner)
 		if err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			log.Println(err)
 			return
 		}
-		http.Redirect(w, r, "/runners", http.StatusFound)
+		_, err = CreateRunner(name, hash)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+
+		type data struct {
+			Name      string
+			RunnerKey string
+			Title     string
+		}
+		title := "New Runner created successfully"
+		d := data{Name: name, RunnerKey: pass, Title: title}
+		err = templates.ExecuteTemplate(w, "new-runner-success.html", d)
+		if err != nil {
+			log.Println(err)
+		}
 		return
 	}
 
