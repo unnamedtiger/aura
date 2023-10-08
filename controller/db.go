@@ -71,6 +71,7 @@ type Project struct {
 type Runner struct {
 	Id   int64
 	Name string
+	Auth []byte
 }
 
 func CreateEntity(projectId int64, key string, val string, created time.Time) error {
@@ -347,7 +348,7 @@ func FindQueuedJobs(before int64, limit int64) ([]Job, error) {
 }
 
 func FindRunnerByName(name string) (Runner, error) {
-	rows, err := db.Query("SELECT id, name FROM runners WHERE name = ?", name)
+	rows, err := db.Query("SELECT id, name, auth FROM runners WHERE name = ?", name)
 	if err != nil {
 		return Runner{}, err
 	}
@@ -444,7 +445,7 @@ func LoadProjects() ([]Project, error) {
 }
 
 func LoadRunner(id int64) (Runner, error) {
-	rows, err := db.Query("SELECT id, name FROM runners WHERE id = ?", id)
+	rows, err := db.Query("SELECT id, name, auth FROM runners WHERE id = ?", id)
 	if err != nil {
 		return Runner{}, err
 	}
@@ -460,7 +461,7 @@ func LoadRunner(id int64) (Runner, error) {
 }
 
 func LoadRunners() ([]Runner, error) {
-	rows, err := db.Query("SELECT id, name FROM runners ORDER BY name ASC")
+	rows, err := db.Query("SELECT id, name, auth FROM runners ORDER BY name ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -583,11 +584,12 @@ func ScanProject(rows *sql.Rows) (Project, error) {
 func ScanRunner(rows *sql.Rows) (Runner, error) {
 	var id int64
 	var name string
-	err := rows.Scan(&id, &name)
+	var auth []byte
+	err := rows.Scan(&id, &name, &auth)
 	if err != nil {
 		return Runner{}, err
 	}
-	return Runner{Id: id, Name: name}, nil
+	return Runner{Id: id, Name: name, Auth: auth}, nil
 }
 
 func tryExec(tx *sql.Tx, query string, args ...any) {

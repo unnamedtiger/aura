@@ -21,8 +21,9 @@ type ApiResponse struct {
 }
 
 type JobRequest struct {
-	Id       int64 `json:"id"`
-	ExitCode int64 `json:"exitCode"`
+	Name     string `json:"name"`
+	Id       int64  `json:"id"`
+	ExitCode int64  `json:"exitCode"`
 }
 
 type RunnerRequest struct {
@@ -123,6 +124,14 @@ func ApiSubmit(req SubmitRequest) (int64, ApiResponse, error) {
 	return jobId, ApiResponse{Code: http.StatusAccepted, Message: "job created"}, nil
 }
 
+func checkRunnerAuth(runnerAuth []byte, auth string) (bool, error) {
+	if strings.HasPrefix(auth, "AURA_RUNNERKEY_") {
+		return CompareHashAndPassword(runnerAuth, auth)
+	} else {
+		return false, nil
+	}
+}
+
 func respond(w http.ResponseWriter, code int, data any) {
 	respBody, err := json.Marshal(data)
 	if err != nil {
@@ -154,6 +163,28 @@ func RouteApiJob(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
+	runner, err := FindRunnerByName(req.Name)
+	if err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		log.Println(err)
+		return
+	}
+	authHeader := r.Header.Get("Authorization")
+	if len(authHeader) == 0 {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	authHeader = strings.TrimPrefix(authHeader, "Bearer ")
+	authOk, err := checkRunnerAuth(runner.Auth, authHeader)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	if !authOk {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	status := StatusFailed
 	if req.ExitCode == 0 {
@@ -166,7 +197,7 @@ func RouteApiJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	go handlePrecedingJobCompleted(req.Id, status, t)
-	respond(w, http.StatusAccepted, ApiResponse{Code: http.StatusAccepted, Message: "recorded job completion"})
+	respond(w, http.StatusOK, ApiResponse{Code: http.StatusOK, Message: "recorded job completion"})
 }
 
 func handlePrecedingJobCompleted(jobId int64, status int, now time.Time) {
@@ -215,6 +246,22 @@ func RouteApiRunner(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		log.Println(err)
+		return
+	}
+	authHeader := r.Header.Get("Authorization")
+	if len(authHeader) == 0 {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	authHeader = strings.TrimPrefix(authHeader, "Bearer ")
+	authOk, err := checkRunnerAuth(runner.Auth, authHeader)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	if !authOk {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 	runnerCheckins[req.Name] = t

@@ -18,6 +18,7 @@ import (
 type Config struct {
 	Name       string   `json:"name"`
 	Controller string   `json:"controller"`
+	RunnerKey  string   `json:"runnerKey"`
 	Tags       []string `json:"tags"`
 }
 
@@ -55,6 +56,9 @@ func main() {
 	if len(cfg.Controller) == 0 {
 		log.Fatalln("invalid controller")
 	}
+	if len(cfg.RunnerKey) == 0 {
+		log.Fatalln("invalid runnerKey")
+	}
 	if len(cfg.Tags) == 0 {
 		log.Fatalln("invalid tags")
 	}
@@ -66,9 +70,18 @@ func main() {
 		if err != nil {
 			log.Fatalln(err)
 		}
-		respObj, err := http.Post(cfg.Controller+"/api/runner", "application/json", bytes.NewBuffer(reqData))
+		httpReq, err := http.NewRequest(http.MethodPost, cfg.Controller+"/api/runner", bytes.NewBuffer(reqData))
 		if err != nil {
 			log.Fatalln(err)
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("Authorization", "Bearer "+cfg.RunnerKey)
+		respObj, err := http.DefaultClient.Do(httpReq)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if respObj.StatusCode != http.StatusOK {
+			log.Fatalln("got status " + respObj.Status)
 		}
 		var resp []Job
 		err = json.NewDecoder(respObj.Body).Decode(&resp)
@@ -134,17 +147,29 @@ func runJob(cfg Config, job Job) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	_, err = http.Post(cfg.Controller+"/api/job", "application/json", bytes.NewBuffer(reqData))
+	completeJobReq, err := http.NewRequest(http.MethodPost, cfg.Controller+"/api/job", bytes.NewBuffer(reqData))
 	if err != nil {
 		log.Fatalln(err)
+	}
+	completeJobReq.Header.Set("Content-Type", "application/json")
+	completeJobReq.Header.Set("Authorization", "Bearer "+cfg.RunnerKey)
+	completeJobResp, err := http.DefaultClient.Do(completeJobReq)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if completeJobResp.StatusCode != http.StatusOK {
+		log.Fatalln("got status " + completeJobResp.Status)
 	}
 
 	logUploadReq, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/api/storage/%d/log", cfg.Controller, job.Id), bytes.NewBuffer(out))
 	if err != nil {
 		log.Fatalln(err)
 	}
-	_, err = http.DefaultClient.Do(logUploadReq)
+	logUploadResp, err := http.DefaultClient.Do(logUploadReq)
 	if err != nil {
 		log.Fatalln(err)
+	}
+	if logUploadResp.StatusCode != http.StatusOK {
+		log.Fatalln("got status " + logUploadResp.Status)
 	}
 }
