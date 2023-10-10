@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -363,12 +364,18 @@ func RouteApiRunner(w http.ResponseWriter, r *http.Request) {
 	respond(w, http.StatusOK, RunnerResponse{Jobs: jobs})
 }
 
+var allowedStorageRegex = regexp.MustCompile(`^\d+/log$`)
+
 func RouteApiStorage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	p := strings.TrimPrefix(r.URL.Path, "/api/storage/")
+	if !allowedStorageRegex.MatchString(p) {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
 	p = path.Join("artifacts", p)
 	err := os.MkdirAll(path.Dir(p), os.ModePerm)
 	if err != nil {
