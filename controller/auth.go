@@ -8,6 +8,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const PrefixProject = "AURA_PROJECTKEY_"
 const PrefixRunner = "AURA_RUNNERKEY_"
 
 func GenerateFromPassword(pass string) ([]byte, error) {

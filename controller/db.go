@@ -66,6 +66,7 @@ type Project struct {
 	Id   int64
 	Name string
 	Slug string
+	Auth []byte
 }
 
 type Runner struct {
@@ -92,8 +93,8 @@ func CreatePrecedingJob(olderJob int64, newerJob int64) error {
 	return err
 }
 
-func CreateProject(name string, slug string) (int64, error) {
-	res, err := db.Exec("INSERT INTO projects (id, name, slug) VALUES (NULL, ?, ?)", name, slug)
+func CreateProject(name string, slug string, auth []byte) (int64, error) {
+	res, err := db.Exec("INSERT INTO projects (id, name, slug, auth) VALUES (NULL, ?, ?, ?)", name, slug, auth)
 	if err != nil {
 		return 0, err
 	}
@@ -308,7 +309,7 @@ func FindPrecedingJobs(id int64) ([]Job, error) {
 }
 
 func FindProjectBySlug(slug string) (Project, error) {
-	rows, err := db.Query("SELECT id, name, slug FROM projects WHERE slug = ?", slug)
+	rows, err := db.Query("SELECT id, name, slug, auth FROM projects WHERE slug = ?", slug)
 	if err != nil {
 		return Project{}, err
 	}
@@ -413,7 +414,7 @@ func LoadJob(id int64) (Job, error) {
 }
 
 func LoadProject(id int64) (Project, error) {
-	rows, err := db.Query("SELECT id, name, slug FROM projects WHERE id = ?", id)
+	rows, err := db.Query("SELECT id, name, slug, auth FROM projects WHERE id = ?", id)
 	if err != nil {
 		return Project{}, err
 	}
@@ -429,7 +430,7 @@ func LoadProject(id int64) (Project, error) {
 }
 
 func LoadProjects() ([]Project, error) {
-	rows, err := db.Query("SELECT id, name, slug FROM projects ORDER BY name ASC")
+	rows, err := db.Query("SELECT id, name, slug, auth FROM projects ORDER BY name ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -574,11 +575,12 @@ func ScanProject(rows *sql.Rows) (Project, error) {
 	var id int64
 	var name string
 	var slug string
-	err := rows.Scan(&id, &name, &slug)
+	var auth []byte
+	err := rows.Scan(&id, &name, &slug, &auth)
 	if err != nil {
 		return Project{}, err
 	}
-	return Project{Id: id, Name: name, Slug: slug}, nil
+	return Project{Id: id, Name: name, Slug: slug, Auth: auth}, nil
 }
 
 func ScanRunner(rows *sql.Rows) (Runner, error) {
@@ -605,7 +607,7 @@ func InitializeDatabase() error {
 		return err
 	}
 	tryExec(tx, "CREATE TABLE runners (id INTEGER PRIMARY KEY, name TEXT NOT NULL, auth BLOB NOT NULL)")
-	tryExec(tx, "CREATE TABLE projects (id INTEGER PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL)")
+	tryExec(tx, "CREATE TABLE projects (id INTEGER PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL, auth BLOB NOT NULL)")
 	tryExec(tx, "CREATE TABLE entities (id INTEGER PRIMARY KEY, projectId INTEGER NOT NULL, key TEXT NOT NULL, val TEXT NOT NULL, created INTEGER NOT NULL, FOREIGN KEY (projectId) REFERENCES projects(id))")
 	tryExec(tx, "CREATE TABLE collections (id INTEGER PRIMARY KEY, projectId INTEGER NOT NULL, key TEXT NOT NULL, val TEXT NOT NULL, created INTEGER NOT NULL, FOREIGN KEY (projectId) REFERENCES projects(id))")
 	tryExec(tx, "CREATE TABLE collectionsEntities (id INTEGER PRIMARY KEY, collectionId INTEGER NOT NULL, entityId INTEGER NOT NULL, FOREIGN KEY (collectionId) REFERENCES collections(id), FOREIGN KEY (entityId) REFERENCES entities(id))")
@@ -621,15 +623,15 @@ func FillDatabaseWithDemoData() error {
 		return err
 	}
 
-	authWindows, err := GenerateFromPassword("AURA_RUNNERKEY_buildbox-windows-0000000000000000000000000")
+	authWindows, err := GenerateFromPassword(PrefixRunner + "buildbox-windows-0000000000000000000000000")
 	if err != nil {
 		return err
 	}
-	authLinux, err := GenerateFromPassword("AURA_RUNNERKEY_buildbox-linux-000000000000000000000000000")
+	authLinux, err := GenerateFromPassword(PrefixRunner + "buildbox-linux-000000000000000000000000000")
 	if err != nil {
 		return err
 	}
-	authMacos, err := GenerateFromPassword("AURA_RUNNERKEY_buildbox-macos-000000000000000000000000000")
+	authMacos, err := GenerateFromPassword(PrefixRunner + "buildbox-macos-000000000000000000000000000")
 	if err != nil {
 		return err
 	}
@@ -637,9 +639,21 @@ func FillDatabaseWithDemoData() error {
 	tryExec(tx, "INSERT INTO RUNNERS (id, name, auth) VALUES (NULL, ?, ?)", "buildbox-linux", authLinux)
 	tryExec(tx, "INSERT INTO RUNNERS (id, name, auth) VALUES (NULL, ?, ?)", "buildbox-macos", authMacos)
 
-	tryExec(tx, "INSERT INTO projects (id, name, slug) VALUES (NULL, 'Colors', 'colors')")
-	tryExec(tx, "INSERT INTO projects (id, name, slug) VALUES (NULL, 'Darke', 'darke')")
-	tryExec(tx, "INSERT INTO projects (id, name, slug) VALUES (NULL, 'Aura', 'aura')")
+	authColors, err := GenerateFromPassword(PrefixProject + "colors-00000000000000000000000000000000000")
+	if err != nil {
+		return err
+	}
+	authDarke, err := GenerateFromPassword(PrefixProject + "darke-000000000000000000000000000000000000")
+	if err != nil {
+		return err
+	}
+	authAura, err := GenerateFromPassword(PrefixProject + "aura-0000000000000000000000000000000000000")
+	if err != nil {
+		return err
+	}
+	tryExec(tx, "INSERT INTO projects (id, name, slug, auth) VALUES (NULL, ?, ?, ?)", "Colors", "colors", authColors)
+	tryExec(tx, "INSERT INTO projects (id, name, slug, auth) VALUES (NULL, ?, ?, ?)", "Darke", "darke", authDarke)
+	tryExec(tx, "INSERT INTO projects (id, name, slug, auth) VALUES (NULL, ?, ?, ?)", "Aura", "aura", authAura)
 
 	for i := 1; i <= 135; i++ {
 		dt := t.Add(time.Duration(-(730-i)*24) * time.Hour)

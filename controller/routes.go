@@ -169,13 +169,31 @@ func RouteNewProject(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid slug", http.StatusBadRequest)
 			return
 		}
-		_, err := CreateProject(name, slug)
+		pass, hash, err := GenerateRandom(PrefixProject)
 		if err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			log.Println(err)
 			return
 		}
-		http.Redirect(w, r, "/p/"+slug, http.StatusFound)
+		_, err = CreateProject(name, slug, hash)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+
+		type data struct {
+			Name       string
+			ProjectKey string
+			Slug       string
+			Title      string
+		}
+		title := "New Project created successfully"
+		d := data{Name: name, ProjectKey: pass, Slug: slug, Title: title}
+		err = templates.ExecuteTemplate(w, "new-project-success.html", d)
+		if err != nil {
+			log.Println(err)
+		}
 		return
 	}
 
