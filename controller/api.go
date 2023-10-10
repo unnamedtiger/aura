@@ -49,6 +49,8 @@ type RunnerResponseJob struct {
 }
 
 type SubmitRequest struct {
+	ParentJob *int64 `json:"parentJob"`
+
 	Project   string `json:"project"`
 	EntityKey string `json:"entityKey"`
 	EntityVal string `json:"entityVal"`
@@ -138,6 +140,14 @@ func ApiSubmit(req SubmitRequest) (int64, ApiResponse, error) {
 		}
 	}
 	return jobId, ApiResponse{Code: http.StatusAccepted, Message: "job created"}, nil
+}
+
+func checkJobAuth(jobAuth []byte, auth string) (bool, error) {
+	if strings.HasPrefix(auth, PrefixJob) {
+		return CompareHashAndPassword(jobAuth, auth)
+	} else {
+		return false, nil
+	}
 }
 
 func checkProjectAuth(projectAuth []byte, auth string) (bool, error) {
@@ -421,11 +431,50 @@ func RouteApiSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	authHeader = strings.TrimPrefix(authHeader, "Bearer ")
-	authOk, err := checkProjectAuth(project.Auth, authHeader)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		log.Println(err)
-		return
+	authOk := false
+	if strings.HasPrefix(authHeader, PrefixJob) && req.ParentJob != nil {
+		parentJob, err := LoadJob(*req.ParentJob)
+		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				http.Error(w, "parent job not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+		parentEntity, err := LoadEntity(parentJob.EntityId)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+		if project.Id != parentEntity.ProjectId {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if req.EntityKey != parentEntity.Key {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if req.EntityVal != parentEntity.Val {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		authOk, err = checkJobAuth(parentJob.Auth, authHeader)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+	} else {
+		authOk, err = checkProjectAuth(project.Auth, authHeader)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
 	}
 	if !authOk {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
