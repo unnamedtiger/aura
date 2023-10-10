@@ -290,7 +290,15 @@ func RouteApiRunner(w http.ResponseWriter, r *http.Request) {
 	}
 	jobs := []Job{}
 	for _, candidate := range candidates {
-		job, err := ReserveJobForRunner(candidate, runner.Id, t)
+		pass, hash, err := GenerateRandom(PrefixJob)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+		// TODO: remove printf and send pass to runner
+		log.Printf("pass is %s\n", pass)
+		job, err := ReserveJobForRunner(candidate, hash, runner.Id, t)
 		if err != nil {
 			if errors.Is(err, ErrNotFound) {
 				continue

@@ -8,6 +8,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const PrefixJob = "AURA_JOBKEY_"
 const PrefixProject = "AURA_PROJECTKEY_"
 const PrefixRunner = "AURA_RUNNERKEY_"
 
