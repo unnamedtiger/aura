@@ -32,6 +32,22 @@ type RunnerRequest struct {
 	Limit int      `json:"limit"`
 }
 
+type RunnerResponse struct {
+	Jobs []RunnerResponseJob `json:"jobs"`
+}
+
+type RunnerResponseJob struct {
+	Id        int64  `json:"id"`
+	Project   string `json:"project"`
+	EntityKey string `json:"entityKey"`
+	EntityVal string `json:"entityVal"`
+	Name      string `json:"name"`
+	JobKey    string `json:"jobKey"`
+	Cmd       string `json:"cmd"`
+	Env       string `json:"env"`
+	Tag       string `json:"tag"`
+}
+
 type SubmitRequest struct {
 	Project   string `json:"project"`
 	EntityKey string `json:"entityKey"`
@@ -288,7 +304,7 @@ func RouteApiRunner(w http.ResponseWriter, r *http.Request) {
 			candidates = append(candidates, jobIds...)
 		}
 	}
-	jobs := []Job{}
+	jobs := []RunnerResponseJob{}
 	for _, candidate := range candidates {
 		pass, hash, err := GenerateRandom(PrefixJob)
 		if err != nil {
@@ -296,9 +312,7 @@ func RouteApiRunner(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 			return
 		}
-		// TODO: remove printf and send pass to runner
-		log.Printf("pass is %s\n", pass)
-		job, err := ReserveJobForRunner(candidate, hash, runner.Id, t)
+		jobObj, err := ReserveJobForRunner(candidate, hash, runner.Id, t)
 		if err != nil {
 			if errors.Is(err, ErrNotFound) {
 				continue
@@ -307,13 +321,36 @@ func RouteApiRunner(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 			return
 		}
+		entity, err := LoadEntity(jobObj.EntityId)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+		project, err := LoadProject(entity.ProjectId)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+		job := RunnerResponseJob{
+			Id:        jobObj.Id,
+			Project:   project.Name,
+			EntityKey: entity.Key,
+			EntityVal: entity.Val,
+			Name:      jobObj.Name,
+			JobKey:    pass,
+			Cmd:       jobObj.Cmd,
+			Env:       jobObj.Env,
+			Tag:       jobObj.Tag,
+		}
 		jobs = append(jobs, job)
 		if len(jobs) >= req.Limit {
 			break
 		}
 	}
 
-	respond(w, http.StatusOK, jobs)
+	respond(w, http.StatusOK, RunnerResponse{Jobs: jobs})
 }
 
 func RouteApiStorage(w http.ResponseWriter, r *http.Request) {

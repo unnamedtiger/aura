@@ -28,10 +28,20 @@ type Request struct {
 	Limit int      `json:"limit"`
 }
 
-type Job struct {
-	Id  int64
-	Cmd string
-	Env string
+type RunnerResponse struct {
+	Jobs []RunnerResponseJob `json:"jobs"`
+}
+
+type RunnerResponseJob struct {
+	Id        int64  `json:"id"`
+	Project   string `json:"project"`
+	EntityKey string `json:"entityKey"`
+	EntityVal string `json:"entityVal"`
+	Name      string `json:"name"`
+	JobKey    string `json:"jobKey"`
+	Cmd       string `json:"cmd"`
+	Env       string `json:"env"`
+	Tag       string `json:"tag"`
 }
 
 type Results struct {
@@ -83,15 +93,15 @@ func main() {
 		if respObj.StatusCode != http.StatusOK {
 			log.Fatalln("got status " + respObj.Status)
 		}
-		var resp []Job
+		var resp RunnerResponse
 		err = json.NewDecoder(respObj.Body).Decode(&resp)
 		if err != nil {
 			log.Fatalln(err)
 		}
 		respObj.Body.Close()
 
-		if len(resp) > 0 {
-			for _, job := range resp {
+		if len(resp.Jobs) > 0 {
+			for _, job := range resp.Jobs {
 				log.Printf("Running job %d...", job.Id)
 				runJob(cfg, job)
 			}
@@ -102,7 +112,7 @@ func main() {
 	}
 }
 
-func runJob(cfg Config, job Job) {
+func runJob(cfg Config, job RunnerResponseJob) {
 	exitCode := 0
 	out := []byte{}
 	parts, err := shlex.Split(job.Cmd)
@@ -122,7 +132,17 @@ func runJob(cfg Config, job Job) {
 		} else {
 			cmd := exec.Command(parts[0], partsArgs...)
 			cmd.Dir = wd
-			cmd.Env = strings.Split(job.Env, "\n")
+			env := []string{}
+			env = append(env, "CI=true")
+			env = append(env, "AURA_CI=true")
+			env = append(env, fmt.Sprintf("AURA_JOBID=%d", job.Id))
+			env = append(env, fmt.Sprintf("AURA_JOBNAME=%s", job.Name))
+			env = append(env, fmt.Sprintf("AURA_JOBKEY=%s", job.JobKey))
+			env = append(env, fmt.Sprintf("AURA_PROJECT=%s", job.Project))
+			env = append(env, fmt.Sprintf("AURA_ENTITYKEY=%s", job.EntityKey))
+			env = append(env, fmt.Sprintf("AURA_ENTITYVAL=%s", job.EntityVal))
+			env = append(env, strings.Split(job.Env, "\n")...)
+			cmd.Env = env
 			out, err = cmd.CombinedOutput()
 			if err != nil {
 				exitError, ok := err.(*exec.ExitError)
