@@ -124,8 +124,16 @@ func ApiSubmit(req SubmitRequest) (int64, ApiResponse, error) {
 	return jobId, ApiResponse{Code: http.StatusAccepted, Message: "job created"}, nil
 }
 
+func checkProjectAuth(projectAuth []byte, auth string) (bool, error) {
+	if strings.HasPrefix(auth, PrefixProject) {
+		return CompareHashAndPassword(projectAuth, auth)
+	} else {
+		return false, nil
+	}
+}
+
 func checkRunnerAuth(runnerAuth []byte, auth string) (bool, error) {
-	if strings.HasPrefix(auth, "AURA_RUNNERKEY_") {
+	if strings.HasPrefix(auth, PrefixRunner) {
 		return CompareHashAndPassword(runnerAuth, auth)
 	} else {
 		return false, nil
@@ -352,7 +360,32 @@ func RouteApiSubmit(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	// TODO: auth
+	project, err := FindProjectBySlug(req.Project)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			http.Error(w, "project not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	authHeader := r.Header.Get("Authorization")
+	if len(authHeader) == 0 {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	authHeader = strings.TrimPrefix(authHeader, "Bearer ")
+	authOk, err := checkProjectAuth(project.Auth, authHeader)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	if !authOk {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	jobId, resp, err := ApiSubmit(req)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
