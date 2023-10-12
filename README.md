@@ -22,13 +22,17 @@ Aura consists of two parts
 Both parts can run on the same physical machine.
 
 First start up the controller.
-It will store its data in the current working directory:
+The first time it starts up it will print the admin key to the console.
+Store that somewhere safe.
+
+Aura stores its data in the current working directory:
 
 * the database will be stored in the file `aura.db`
 * the directory `artifacts` will contain the logs for the build jobs
 
 Open up the web interface at http://localhost:8420/ and click on Runner Status.
-Click on New Runner and give your runner a name.
+Click on New Runner, give your runner a name and input your admin key.
+On the confirmation page make sure you copy the API key your new runner will be using down somewhere safe.
 Back on the Runner Status page the new runner will be listed as offline.
 
 In a new working directory (potentially on another machine) create a `config.json` file for the runner.
@@ -37,12 +41,15 @@ In a new working directory (potentially on another machine) create a `config.jso
 {
     "name": "buildbox-windows",
     "controller": "http://localhost:8420",
+    "runnerKey": "AURA_RUNNERKEY_buildbox-windows-0000000000000000000000000",
     "tags": ["native,windows"]
 }
 ```
 
 Set the `name` to what you just provided when creating the runner on the controller.
 Set `controller` so that the runner can reach the controller using that information.
+Set `runnerKey` to the key you got when you created the runner.
+It starts with `AURA_RUNNERKEY_`.
 Set `tags` to one or more tags that build jobs that this runner can handle will have.
 Read more about tags [here](docs/tags.md).
 
@@ -51,21 +58,23 @@ It should contact the controller, get no jobs to run, and then output `Sleeping.
 Once you refresh the Runner Status page of the controller you'll see that your new runner is listed with a recent checkin and all tags you provided are also listed as checked-in recently.
 
 In the web interface click on the **A** logo in the top left and on New Project.
-Give your project a name and URL slug and create it.
+Give your project a name and URL slug, input the admin key and create the project.
+As before this'll be the only time you'll be able to see the project key, so note it down.
 Now you're ready to submit the first job.
 
 Prepare to `POST` some JSON to `/api/submit`.
 With [Curl](https://curl.se/) use the following command:
 
 ```sh
-curl --header "Content-Type: application/json" --request POST --data "@submit.json"  http://localhost:8420/api/submit
+curl --header "Authorization: Bearer AURA_PROJECTKEY_colors-00000000000000000000000000000000000" --header "Content-Type: application/json" --request POST --data "@submit.json"  http://localhost:8420/api/submit
 ```
 
+Be sure to replace the project key with one valid for your project.
 In this case the content of the file `submit.json` and in any other case the json you want to submit should look as follows:
 
 ```json
 {
-    "project": "test",
+    "project": "colors",
     "entityKey": "rev",
     "entityVal": "1",
     "name": "test",
