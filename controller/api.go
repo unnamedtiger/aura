@@ -144,9 +144,19 @@ func ApiSubmit(req SubmitRequest) (int64, ApiResponse, error) {
 	return jobId, ApiResponse{Code: http.StatusAccepted, Message: "job created"}, nil
 }
 
+func checkAdminAuth(auth string) (bool, error) {
+	admin, err := LoadAdmin()
+	if err != nil {
+		return false, err
+	}
+	return CompareHashAndPassword(admin.Auth, auth)
+}
+
 func checkJobAuth(jobAuth []byte, auth string) (bool, error) {
 	if strings.HasPrefix(auth, PrefixJob) {
 		return CompareHashAndPassword(jobAuth, auth)
+	} else if strings.HasPrefix(auth, PrefixAdmin) {
+		return checkAdminAuth(auth)
 	} else {
 		return false, nil
 	}
@@ -155,6 +165,8 @@ func checkJobAuth(jobAuth []byte, auth string) (bool, error) {
 func checkProjectAuth(projectAuth []byte, auth string) (bool, error) {
 	if strings.HasPrefix(auth, PrefixProject) {
 		return CompareHashAndPassword(projectAuth, auth)
+	} else if strings.HasPrefix(auth, PrefixAdmin) {
+		return checkAdminAuth(auth)
 	} else {
 		return false, nil
 	}
@@ -163,6 +175,8 @@ func checkProjectAuth(projectAuth []byte, auth string) (bool, error) {
 func checkRunnerAuth(runnerAuth []byte, auth string) (bool, error) {
 	if strings.HasPrefix(auth, PrefixRunner) {
 		return CompareHashAndPassword(runnerAuth, auth)
+	} else if strings.HasPrefix(auth, PrefixAdmin) {
+		return checkAdminAuth(auth)
 	} else {
 		return false, nil
 	}

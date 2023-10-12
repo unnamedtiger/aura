@@ -169,6 +169,17 @@ func RouteNewProject(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid slug", http.StatusBadRequest)
 			return
 		}
+		adminKey := r.FormValue("adminKey")
+		authOk, err := checkAdminAuth(adminKey)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+		if !authOk {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 		pass, hash, err := GenerateRandom(PrefixProject)
 		if err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -213,6 +224,17 @@ func RouteNewRunner(w http.ResponseWriter, r *http.Request) {
 		name := r.FormValue("name")
 		if !slugRegex.MatchString(name) {
 			http.Error(w, "invalid name", http.StatusBadRequest)
+			return
+		}
+		adminKey := r.FormValue("adminKey")
+		authOk, err := checkAdminAuth(adminKey)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+		if !authOk {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 		pass, hash, err := GenerateRandom(PrefixRunner)
