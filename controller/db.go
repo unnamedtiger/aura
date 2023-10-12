@@ -39,6 +39,11 @@ func jobStatus(status int) string {
 	}
 }
 
+type Admin struct {
+	Id   int64
+	Auth []byte
+}
+
 type EntityOrCollection struct {
 	Id        int64
 	ProjectId int64
@@ -383,6 +388,22 @@ func FindSuccedingJobIds(id int64) ([]int64, error) {
 	return results, nil
 }
 
+func LoadAdmin() (Admin, error) {
+	rows, err := db.Query("SELECT id, auth FROM admins")
+	if err != nil {
+		return Admin{}, err
+	}
+	if rows.Next() {
+		admin, err := ScanAdmin(rows)
+		rows.Close()
+		if err != nil {
+			return Admin{}, err
+		}
+		return admin, nil
+	}
+	return Admin{}, ErrNotFound
+}
+
 func LoadEntity(id int64) (EntityOrCollection, error) {
 	rows, err := db.Query("SELECT id, projectId, key, val, created FROM entities WHERE id = ?", id)
 	if err != nil {
@@ -519,6 +540,16 @@ func ReserveJobForRunner(jobId int64, auth []byte, runnerId int64, now time.Time
 	}
 }
 
+func ScanAdmin(rows *sql.Rows) (Admin, error) {
+	var id int64
+	var auth []byte
+	err := rows.Scan(&id, &auth)
+	if err != nil {
+		return Admin{}, err
+	}
+	return Admin{Id: id, Auth: auth}, nil
+}
+
 func ScanEntityOrCollection(rows *sql.Rows) (EntityOrCollection, error) {
 	var id int64
 	var projectId int64
@@ -610,6 +641,7 @@ func InitializeDatabase() error {
 	if err != nil {
 		return err
 	}
+	tryExec(tx, "CREATE TABLE admins (id INTEGER PRIMARY KEY, auth BLOB NOT NULL)")
 	tryExec(tx, "CREATE TABLE runners (id INTEGER PRIMARY KEY, name TEXT NOT NULL, auth BLOB NOT NULL)")
 	tryExec(tx, "CREATE TABLE projects (id INTEGER PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL, auth BLOB NOT NULL)")
 	tryExec(tx, "CREATE TABLE entities (id INTEGER PRIMARY KEY, projectId INTEGER NOT NULL, key TEXT NOT NULL, val TEXT NOT NULL, created INTEGER NOT NULL, FOREIGN KEY (projectId) REFERENCES projects(id))")
@@ -617,6 +649,14 @@ func InitializeDatabase() error {
 	tryExec(tx, "CREATE TABLE collectionsEntities (id INTEGER PRIMARY KEY, collectionId INTEGER NOT NULL, entityId INTEGER NOT NULL, FOREIGN KEY (collectionId) REFERENCES collections(id), FOREIGN KEY (entityId) REFERENCES entities(id))")
 	tryExec(tx, "CREATE TABLE jobs (id INTEGER PRIMARY KEY, entityId INTEGER NOT NULL, name TEXT NOT NULL, status INTEGER NOT NULL, created INTEGER NOT NULL, earliestStart INTEGER NOT NULL, started INTEGER, ended INTEGER, auth BLOB, cmd TEXT NOT NULL, env TEXT NOT NULL, tag TEXT NOT NULL, runner INTEGER, exitCode INTEGER NOT NULL, FOREIGN KEY (entityId) REFERENCES entities(id), FOREIGN KEY (runner) REFERENCES runners(id))")
 	tryExec(tx, "CREATE TABLE precedingJobs (id INTEGER PRIMARY KEY, olderJob INTEGER NOT NULL, newerJob INTEGER NOT NULL, FOREIGN KEY (olderJob) References jobs(id), FOREIGN KEY (newerJob) REFERENCES jobs(id))")
+
+	pass, hash, err := GenerateRandom(PrefixAdmin)
+	if err != nil {
+		return err
+	}
+	log.Printf("Admin Key: %s", pass)
+	tryExec(tx, "INSERT INTO admins (id, auth) VALUES (NULL, ?)", hash)
+
 	return tx.Commit()
 }
 
@@ -639,9 +679,9 @@ func FillDatabaseWithDemoData() error {
 	if err != nil {
 		return err
 	}
-	tryExec(tx, "INSERT INTO RUNNERS (id, name, auth) VALUES (NULL, ?, ?)", "buildbox-windows", authWindows)
-	tryExec(tx, "INSERT INTO RUNNERS (id, name, auth) VALUES (NULL, ?, ?)", "buildbox-linux", authLinux)
-	tryExec(tx, "INSERT INTO RUNNERS (id, name, auth) VALUES (NULL, ?, ?)", "buildbox-macos", authMacos)
+	tryExec(tx, "INSERT INTO runners (id, name, auth) VALUES (NULL, ?, ?)", "buildbox-windows", authWindows)
+	tryExec(tx, "INSERT INTO runners (id, name, auth) VALUES (NULL, ?, ?)", "buildbox-linux", authLinux)
+	tryExec(tx, "INSERT INTO runners (id, name, auth) VALUES (NULL, ?, ?)", "buildbox-macos", authMacos)
 
 	authColors, err := GenerateFromPassword(PrefixProject + "colors-00000000000000000000000000000000000")
 	if err != nil {
