@@ -185,6 +185,8 @@ func runJob(cfg Config, job RunnerResponseJob) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	logUploadReq.Header.Set("Content-Type", "application/json")
+	logUploadReq.Header.Set("Authorization", "Bearer "+cfg.RunnerKey)
 	logUploadResp, err := http.DefaultClient.Do(logUploadReq)
 	if err != nil {
 		log.Fatalln(err)

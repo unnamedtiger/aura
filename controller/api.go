@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -376,8 +377,55 @@ func RouteApiStorage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
+	jobIdString := p[:strings.Index(p, "/")]
+	jobId, err := strconv.ParseInt(jobIdString, 10, 64)
+	if err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		log.Println(err)
+		return
+	}
+	job, err := LoadJob(jobId)
+	if err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		log.Println(err)
+		return
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	if len(authHeader) == 0 {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	authHeader = strings.TrimPrefix(authHeader, "Bearer ")
+	authOk := false
+	if strings.HasPrefix(authHeader, PrefixRunner) {
+		runner, err := LoadRunner(job.Runner)
+		if err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			log.Println(err)
+			return
+		}
+		authOk, err = checkRunnerAuth(runner.Auth, authHeader)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+	} else {
+		authOk, err = checkJobAuth(job.Auth, authHeader)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			log.Println(err)
+			return
+		}
+	}
+	if !authOk {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	p = path.Join("artifacts", p)
-	err := os.MkdirAll(path.Dir(p), os.ModePerm)
+	err = os.MkdirAll(path.Dir(p), os.ModePerm)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		log.Println(err)
