@@ -18,7 +18,7 @@ pre { margin: 0; }
 .menubar > a.logo { height: 32px; margin: auto 1em; padding: 0; }
 .menubar > a.logo > img { height: 32px; }
 
-.jobitem { border-style: solid; border-width: 4px; display: grid; grid-template-columns: min-content auto; }
+.jobitem { border-style: solid; border-width: 4px 4px 4px 0; display: grid; grid-template-columns: min-content auto; }
 .jobitem.succeeded { background-color: #3adb76; border-color: #3adb76; }
 .jobitem.failed { background-color: #cc4b37; border-color: #cc4b37; }
 .jobitem.started { background-color: #1779ba; border-color: #1779ba; }
