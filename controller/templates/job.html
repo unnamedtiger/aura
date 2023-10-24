@@ -26,6 +26,14 @@
             <hr/>
             <div class="item"><b>Command</b> {{ .Job.Cmd }}</div>
             <div class="item"><b>Tag</b> {{ .Job.Tag }}</div>
+            {{ if .JobEnvKeys }}
+            <div class="item"><b>Environment Variables</b></div>
+            <ul style="margin: 0;">
+            {{ range $key := .JobEnvKeys }}
+            <li class="item">{{ $key }}</li>
+            {{ end }}
+            </ul>
+            {{ end }}
             {{ if or (or (eq .JobStatus "started") (eq .JobStatus "succeeded")) (eq .JobStatus "failed") }}
             <div class="item"><b>Runner</b> {{ .Runner.Name }}</div>
             {{ end }}

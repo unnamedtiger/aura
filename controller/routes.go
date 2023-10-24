@@ -97,6 +97,11 @@ func RouteJob(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	jobEnvKeys := []string{}
+	for _, envVariable := range strings.Split(job.Env, "\n") {
+		k, _, _ := strings.Cut(envVariable, "=")
+		jobEnvKeys = append(jobEnvKeys, k)
+	}
 
 	type dataJob struct {
 		Job         Job
@@ -143,6 +148,7 @@ func RouteJob(w http.ResponseWriter, r *http.Request) {
 		EntityVal            string
 		Job                  Job
 		JobDuration          string
+		JobEnvKeys           []string
 		JobStatus            string
 		Log                  string
 		Minimal              bool
@@ -154,7 +160,7 @@ func RouteJob(w http.ResponseWriter, r *http.Request) {
 		WaitingEarliestStart bool
 	}
 	title := fmt.Sprintf("Job #%d", jobId)
-	d := data{EntityKey: entity.Key, EntityVal: entity.Val, Job: job, JobDuration: jobDuration, JobStatus: jobStatus(job.Status), Log: logContent, Minimal: true, PrecedingJobs: precedingDataJobs, ProjectName: project.Name, ProjectSlug: project.Slug, Runner: runner, Title: title, WaitingEarliestStart: job.EarliestStart.After(t)}
+	d := data{EntityKey: entity.Key, EntityVal: entity.Val, Job: job, JobDuration: jobDuration, JobEnvKeys: jobEnvKeys, JobStatus: jobStatus(job.Status), Log: logContent, Minimal: true, PrecedingJobs: precedingDataJobs, ProjectName: project.Name, ProjectSlug: project.Slug, Runner: runner, Title: title, WaitingEarliestStart: job.EarliestStart.After(t)}
 	err = templates.ExecuteTemplate(w, "job.html", d)
 	if err != nil {
 		log.Println(err)
