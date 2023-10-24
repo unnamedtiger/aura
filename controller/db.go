@@ -82,6 +82,11 @@ type Runner struct {
 	Auth []byte
 }
 
+func CreateCollection(projectId int64, key string, val string, created time.Time) error {
+	_, err := db.Exec("INSERT INTO collections (id, projectId, key, val, created) VALUES (NULL, ?, ?, ?, ?)", projectId, key, val, created.Unix())
+	return err
+}
+
 func CreateEntity(projectId int64, key string, val string, created time.Time) error {
 	_, err := db.Exec("INSERT INTO entities (id, projectId, key, val, created) VALUES (NULL, ?, ?, ?, ?)", projectId, key, val, created.Unix())
 	return err
@@ -386,6 +391,19 @@ func FindSuccedingJobIds(id int64) ([]int64, error) {
 		results = append(results, id)
 	}
 	return results, nil
+}
+
+func InsertEntityIntoCollection(collectionId int64, entityId int64) error {
+	rows, err := db.Query("SELECT id, collectionId, entityId FROM collectionsEntities WHERE collectionId = ? AND entityId = ?", collectionId, entityId)
+	if err != nil {
+		return err
+	}
+	if rows.Next() {
+		rows.Close()
+		return nil
+	}
+	_, err = db.Exec("INSERT INTO collectionsEntities (id, collectionId, entityId) VALUES (NULL, ?, ?)", collectionId, entityId)
+	return err
 }
 
 func LoadAdmin() (Admin, error) {

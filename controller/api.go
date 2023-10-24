@@ -61,6 +61,8 @@ type SubmitRequest struct {
 	Env       string `json:"env"`
 	Tag       string `json:"tag"`
 
+	Collections map[string]string `json:"collections"`
+
 	PrecedingJobs []int64 `json:"precedingJobs"`
 	EarliestStart *int64  `json:"earliestStart"`
 }
@@ -95,6 +97,27 @@ func ApiSubmit(req SubmitRequest) (int64, ApiResponse, error) {
 				return 0, ApiResponse{}, err
 			}
 		} else {
+			return 0, ApiResponse{}, err
+		}
+	}
+	for key, value := range req.Collections {
+		coll, err := FindCollection(project.Id, key, value)
+		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				err = CreateCollection(project.Id, key, value, t)
+				if err != nil {
+					return 0, ApiResponse{}, err
+				}
+			} else {
+				return 0, ApiResponse{}, err
+			}
+			coll, err = FindCollection(project.Id, key, value)
+			if err != nil {
+				return 0, ApiResponse{}, err
+			}
+		}
+		err = InsertEntityIntoCollection(coll.Id, entity.Id)
+		if err != nil {
 			return 0, ApiResponse{}, err
 		}
 	}
@@ -527,6 +550,10 @@ func RouteApiSubmit(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if req.EntityVal != parentEntity.Val {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if len(req.Collections) > 0 {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
