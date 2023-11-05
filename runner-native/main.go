@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/shlex"
+	"github.com/unnamedtiger/aura/api"
 )
 
 type Config struct {
@@ -20,34 +22,6 @@ type Config struct {
 	Controller string   `json:"controller"`
 	RunnerKey  string   `json:"runnerKey"`
 	Tags       []string `json:"tags"`
-}
-
-type Request struct {
-	Name  string   `json:"name"`
-	Tags  []string `json:"tags"`
-	Limit int      `json:"limit"`
-}
-
-type RunnerResponse struct {
-	Jobs []RunnerResponseJob `json:"jobs"`
-}
-
-type RunnerResponseJob struct {
-	Id        int64  `json:"id"`
-	Project   string `json:"project"`
-	EntityKey string `json:"entityKey"`
-	EntityVal string `json:"entityVal"`
-	Name      string `json:"name"`
-	JobKey    string `json:"jobKey"`
-	Cmd       string `json:"cmd"`
-	Env       string `json:"env"`
-	Tag       string `json:"tag"`
-}
-
-type Results struct {
-	Name     string `json:"name"`
-	Id       int64  `json:"id"`
-	ExitCode int64  `json:"exitCode"`
 }
 
 func main() {
@@ -72,15 +46,20 @@ func main() {
 	if len(cfg.Tags) == 0 {
 		log.Fatalln("invalid tags")
 	}
+	controllerUrl, err := url.Parse(cfg.Controller)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	auraApi := api.New(controllerUrl)
 	log.Printf("Starting runner %s...", cfg.Name)
 
 	for {
-		req := Request{Name: cfg.Name, Tags: cfg.Tags, Limit: 1}
+		req := api.RunnerRequest{Name: cfg.Name, Tags: cfg.Tags, Limit: 1}
 		reqData, err := json.Marshal(req)
 		if err != nil {
 			log.Fatalln(err)
 		}
-		httpReq, err := http.NewRequest(http.MethodPost, cfg.Controller+"/api/runner", bytes.NewBuffer(reqData))
+		httpReq, err := http.NewRequest(http.MethodPost, auraApi.Runner(), bytes.NewBuffer(reqData))
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -93,7 +72,7 @@ func main() {
 		if respObj.StatusCode != http.StatusOK {
 			log.Fatalln("got status " + respObj.Status)
 		}
-		var resp RunnerResponse
+		var resp api.RunnerResponse
 		err = json.NewDecoder(respObj.Body).Decode(&resp)
 		if err != nil {
 			log.Fatalln(err)
@@ -103,7 +82,7 @@ func main() {
 		if len(resp.Jobs) > 0 {
 			for _, job := range resp.Jobs {
 				log.Printf("Running job %d...", job.Id)
-				runJob(cfg, job)
+				runJob(cfg, auraApi, job)
 			}
 		} else {
 			log.Println("Sleeping...")
@@ -112,7 +91,7 @@ func main() {
 	}
 }
 
-func runJob(cfg Config, job RunnerResponseJob) {
+func runJob(cfg Config, auraApi *api.AuraApi, job api.RunnerResponseJob) {
 	exitCode := 0
 	out := []byte{}
 	parts, err := shlex.Split(job.Cmd)
@@ -162,12 +141,12 @@ func runJob(cfg Config, job RunnerResponseJob) {
 		}
 	}
 
-	req := Results{Name: cfg.Name, Id: job.Id, ExitCode: int64(exitCode)}
+	req := api.JobRequest{Name: cfg.Name, Id: job.Id, ExitCode: int64(exitCode)}
 	reqData, err := json.Marshal(req)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	completeJobReq, err := http.NewRequest(http.MethodPost, cfg.Controller+"/api/job", bytes.NewBuffer(reqData))
+	completeJobReq, err := http.NewRequest(http.MethodPost, auraApi.Job(), bytes.NewBuffer(reqData))
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -181,7 +160,7 @@ func runJob(cfg Config, job RunnerResponseJob) {
 		log.Fatalln("got status " + completeJobResp.Status)
 	}
 
-	logUploadReq, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/api/storage/%d/log", cfg.Controller, job.Id), bytes.NewBuffer(out))
+	logUploadReq, err := http.NewRequest(http.MethodPost, auraApi.Storage(job.Id, "log"), bytes.NewBuffer(out))
 	if err != nil {
 		log.Fatalln(err)
 	}

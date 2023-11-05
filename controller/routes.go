@@ -99,8 +99,10 @@ func RouteJob(w http.ResponseWriter, r *http.Request) {
 	}
 	jobEnvKeys := []string{}
 	for _, envVariable := range strings.Split(job.Env, "\n") {
-		k, _, _ := strings.Cut(envVariable, "=")
-		jobEnvKeys = append(jobEnvKeys, k)
+		if len(envVariable) > 0 {
+			k, _, _ := strings.Cut(envVariable, "=")
+			jobEnvKeys = append(jobEnvKeys, k)
+		}
 	}
 
 	type dataJob struct {
