@@ -53,7 +53,7 @@
     <div class="jobdesc">
         <span class="title"><a href="/j/{{ .Job.Id }}">{{ .Job.Name }}</a></span>
         {{ if not .Minimal }}
-        {{ if eq .JobStatus "created" }}
+        {{ if or (eq .JobStatus "created") (eq .JobStatus "submitted") }}
         <span class="small">created {{ buildTimer .Job.Created }}</span>
         {{ else if eq .JobStatus "started" }}
         <span class="small">started {{ buildTimer .Job.Started }}</span>

@@ -171,7 +171,11 @@ func submitPostprocessing(sub Submission, jobId int64, t time.Time, entityId int
 		}
 	}
 
-	// TODO: only now allow runners to get this job
+	err := MarkJobCreated(jobId)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 }
 
 func RouteApiSubmit(w http.ResponseWriter, r *http.Request) {

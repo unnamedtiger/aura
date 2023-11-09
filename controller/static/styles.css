@@ -24,6 +24,7 @@ pre { margin: 0; }
 .jobitem.started { background-color: #1779ba; border-color: #1779ba; }
 .jobitem.warning { background-color: #ffae00; border-color: #ffae00; }
 .jobitem.created { background-color: #767676; border-color: #767676; }
+.jobitem.submitted { background-color: #767676; border-color: #767676; }
 .jobitem.cancelled { background-color: #181818; border-color: #181818; }
 .jobitem a { color: black; }
 .jobdesc { color: black; line-height: 1.5em; padding: 0.5em; }
@@ -32,6 +33,7 @@ pre { margin: 0; }
 .jobitem.started > .jobdesc { background-color: #d7ecfa; }
 .jobitem.warning > .jobdesc { background-color: #fff3d9; }
 .jobitem.created > .jobdesc { background-color: #eaeaea; }
+.jobitem.submitted > .jobdesc { background-color: #eaeaea; }
 .jobitem.cancelled > .jobdesc { background-color: #eaeaea; }
 .jobdesc > .title { font-weight: bold; }
 .jobdesc > .small { font-size: 0.75em; }

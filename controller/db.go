@@ -18,6 +18,7 @@ const (
 	StatusCancelled
 	StatusSucceeded
 	StatusFailed
+	StatusSubmitted
 
 	StatusEnd // this is the last one and it's invalid
 )
@@ -34,6 +35,8 @@ func jobStatus(status int) string {
 		return "succeeded"
 	case StatusFailed:
 		return "failed"
+	case StatusSubmitted:
+		return "submitted"
 	default:
 		return "unknown"
 	}
@@ -93,7 +96,7 @@ func CreateEntity(projectId int64, key string, val string, created time.Time) er
 }
 
 func CreateJob(entityId int64, name string, created time.Time, earliestStart time.Time, cmd string, env string, tag string) (int64, error) {
-	res, err := db.Exec("INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, auth, cmd, env, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, NULL, 0)", entityId, name, StatusCreated, created.Unix(), earliestStart.Unix(), cmd, env, tag)
+	res, err := db.Exec("INSERT INTO jobs (id, entityId, name, status, created, earliestStart, started, ended, auth, cmd, env, tag, runner, exitCode) VALUES (NULL, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, NULL, 0)", entityId, name, StatusSubmitted, created.Unix(), earliestStart.Unix(), cmd, env, tag)
 	if err != nil {
 		return 0, err
 	}
@@ -337,8 +340,8 @@ func FindProjectBySlug(slug string) (Project, error) {
 }
 
 func FindQueuedJobs(before int64, limit int64) ([]Job, error) {
-	query := "SELECT id, entityId, name, status, created, earliestStart, started, ended, auth, cmd, env, tag, runner, exitCode FROM jobs WHERE status = ? "
-	args := []any{StatusCreated}
+	query := "SELECT id, entityId, name, status, created, earliestStart, started, ended, auth, cmd, env, tag, runner, exitCode FROM jobs WHERE (status = ? OR status = ?) "
+	args := []any{StatusSubmitted, StatusCreated}
 	if before > 0 {
 		query += "AND created < ? "
 		args = append(args, before)
@@ -516,6 +519,22 @@ func LoadRunners() ([]Runner, error) {
 		results = append(results, runner)
 	}
 	return results, nil
+}
+
+func MarkJobCreated(jobId int64) error {
+	res, err := db.Exec("UPDATE jobs SET status = ? WHERE id = ? AND status = ?", StatusCreated, jobId, StatusSubmitted)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 1 {
+		return nil
+	} else {
+		return ErrNotFound
+	}
 }
 
 func MarkJobDone(jobId int64, status int, exitCode int64, now time.Time) error {
