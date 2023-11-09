@@ -9,7 +9,7 @@
         <a class="item" href="/j/{{ .Job.Id }}">Job #{{ .Job.Id }}</a>
     </div>
     <div class="columns">
-        <div style="max-width: 300px;">
+        <div>
             <div class="item"><b>Project</b> <a href="/p/{{ .ProjectSlug }}">{{ .ProjectName }}</a></div>
             <div class="item"><b>Entity</b> <a class="item" href="/p/{{ .ProjectSlug }}/{{ .EntityKey }}">{{ .EntityKey }}</a> <a class="item" href="/p/{{ .ProjectSlug }}/{{ .EntityKey }}/{{ .EntityVal }}">{{ .EntityVal }}</a></div>
             <div style="margin: 0.5em 0;">

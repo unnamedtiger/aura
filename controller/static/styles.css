@@ -4,7 +4,7 @@ pre { margin: 0; }
 
 .button { background-color: #2b1e3a; display: inline-block; padding: 0.25em 0.5em; vertical-align: middle; }
 .button > a { color: white; }
-.columns { display: grid; grid-template-columns: 1fr 2fr; }
+.columns { display: grid; grid-template-columns: minmax(min(300px, 100%), 1fr) 2fr; }
 @media (max-width: 600px) {
     .columns { grid-template-columns: 1fr; }
 }
