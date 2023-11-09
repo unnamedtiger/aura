@@ -52,6 +52,8 @@ func main() {
 		}
 	}
 
+	InitializeSubmitEndpoints()
+
 	runnerCheckins = make(map[string]time.Time)
 	tagCheckins = make(map[string]time.Time)
 	templateFuncs := template.FuncMap{
@@ -64,6 +66,7 @@ func main() {
 	router.HandleFunc("/api/job", RouteApiJob)
 	router.HandleFunc("/api/runner", RouteApiRunner)
 	router.HandleFunc("/api/storage/", RouteApiStorage)
+	router.HandleFunc("/api/submit/", RouteApiSubmit)
 	router.HandleFunc("/api/submit", RouteApiSubmit)
 	router.HandleFunc("/j/", RouteJob)
 	router.HandleFunc("/new-project", RouteNewProject)
