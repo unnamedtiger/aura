@@ -538,7 +538,7 @@ func MarkJobCreated(jobId int64) error {
 }
 
 func MarkJobDone(jobId int64, status int, exitCode int64, now time.Time) error {
-	res, err := db.Exec("UPDATE jobs SET status = ?, ended = ?, auth = NULL, exitCode = ? WHERE id = ? AND status = ?", status, now.Unix(), exitCode, jobId, StatusStarted)
+	res, err := db.Exec("UPDATE jobs SET status = ?, ended = ?, auth = NULL, exitCode = ? WHERE id = ?", status, now.Unix(), exitCode, jobId)
 	if err != nil {
 		return err
 	}
