@@ -93,3 +93,14 @@ Set `cmd` to the command to run inside the runner.
 And finally, set `tag` to a tag that you assigned to the runner so that the job will be picked up.
 
 Once the job ran to completion, browse to the entity inside your project to see the results.
+
+You probably don't want to submit jobs manually, so instead integrate with one of the following version control servers:
+
+* [Darke Files](docs/submit-darke.md)
+
+Enable an integration by creating a file `config.json` in the working directory of the controller.
+Inside the root object add a new object with the integration's ID as name for every integration you want to enable.
+Put the integration's configuration inside that inner object.
+
+Of course you can also write your own tool that submits jobs to `/api/submit`.
+See [the api package](api/api.go) for API documentation.

@@ -3,18 +3,17 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/unnamedtiger/aura/api"
 )
-
-type Config struct {
-}
 
 // NOTE: ProjectName from api.SubmitRequest is ignored, ProjectId is used instead
 type Submission struct {
@@ -35,9 +34,8 @@ type SubmitEndpoint interface {
 var submitEndpoints map[string]SubmitEndpoint
 
 func InitializeSubmitEndpoints() {
-	var cfg Config
+	var cfg map[string]json.RawMessage
 	submitEndpoints = map[string]SubmitEndpoint{}
-	missingEndpoints := []string{}
 
 	_, err := os.Stat("config.json")
 	if err != nil {
@@ -55,11 +53,25 @@ func InitializeSubmitEndpoints() {
 		}
 	}
 
-	submitEndpoints[""] = SubmitEndpointGeneric{}
+	submitEndpoints[""] = NewSubmitEndpointGeneric()
 	log.Printf("Initialized generic submit endpoint at /api/submit\n")
 
-	if len(missingEndpoints) > 0 {
-		log.Printf("Did not initialize submit endpoint for %s (missing config)\n", strings.Join(missingEndpoints, ", "))
+	cfgKeys := make([]string, 0, len(cfg))
+	for k := range cfg {
+		cfgKeys = append(cfgKeys, k)
+	}
+	sort.Strings(cfgKeys)
+
+	for _, cfgKey := range cfgKeys {
+		if cfgKey == "darke" {
+			submitEndpoints["darke"], err = NewSubmitEndpointDarke(cfg["darke"])
+			if err != nil {
+				log.Fatalln(err)
+			}
+			log.Printf("Initialized submit endpoint for Darke at /api/submit/darke\n")
+		} else {
+			log.Fatalf("Unknown integration '%s'\n", cfgKey)
+		}
 	}
 }
 
@@ -205,11 +217,47 @@ func RouteApiSubmit(w http.ResponseWriter, r *http.Request) {
 	respond(w, http.StatusOK, api.SubmitResponse{Id: jobId})
 }
 
+type GenericJobConfig struct {
+	Project string `json:"project"`
+	Name    string `json:"name"`
+	Cmd     string `json:"cmd"`
+	Env     string `json:"env"`
+	Tag     string `json:"tag"`
+}
+
+func HandleGenericJobConfig(cfg GenericJobConfig, entityKey string, entityVal string, collections map[string]string) (Submission, *SubmitError) {
+	project, err := FindProjectBySlug(cfg.Project)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return Submission{}, &SubmitError{http.StatusBadRequest, "unknown project", err}
+		}
+		return Submission{}, &SubmitError{http.StatusInternalServerError, "internal server error", err}
+	}
+
+	return Submission{
+		SubmitRequest: api.SubmitRequest{
+			Project:     project.Slug,
+			EntityKey:   entityKey,
+			EntityVal:   entityVal,
+			Name:        cfg.Name,
+			Cmd:         cfg.Cmd,
+			Env:         cfg.Env,
+			Tag:         cfg.Tag,
+			Collections: collections,
+		},
+		ProjectId: project.Id,
+	}, nil
+}
+
 // =============================================================================
 // /api/submit
 // =============================================================================
 
 type SubmitEndpointGeneric struct {
+}
+
+func NewSubmitEndpointGeneric() SubmitEndpointGeneric {
+	return SubmitEndpointGeneric{}
 }
 
 func (SubmitEndpointGeneric) HandleRequest(r *http.Request) (Submission, *SubmitError) {
@@ -284,4 +332,47 @@ func (SubmitEndpointGeneric) HandleRequest(r *http.Request) (Submission, *Submit
 		return Submission{}, &SubmitError{http.StatusUnauthorized, "unauthorized", nil}
 	}
 	return Submission{req, project.Id}, nil
+}
+
+// =============================================================================
+// /api/submit/darke
+// =============================================================================
+
+type SubmitEndpointDarke struct {
+	Repos map[string]GenericJobConfig `json:"repos"`
+}
+
+type SubmitRequestDarke struct {
+	Owner   string
+	Repo    string
+	RefName string
+	Commit  string
+}
+
+func NewSubmitEndpointDarke(cfgData json.RawMessage) (*SubmitEndpointDarke, error) {
+	var endpoint SubmitEndpointDarke
+	err := json.Unmarshal(cfgData, &endpoint)
+	if err != nil {
+		return nil, err
+	}
+	return &endpoint, nil
+}
+
+func (e *SubmitEndpointDarke) HandleRequest(r *http.Request) (Submission, *SubmitError) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return Submission{}, &SubmitError{http.StatusInternalServerError, "internal server error", err}
+	}
+	var req SubmitRequestDarke
+	err = json.Unmarshal(body, &req)
+	if err != nil {
+		return Submission{}, &SubmitError{http.StatusBadRequest, "unable to unmarshal json object", err}
+	}
+	repo, found := e.Repos[fmt.Sprintf("%s/%s", req.Owner, req.Repo)]
+	if !found {
+		return Submission{}, &SubmitError{http.StatusBadRequest, "repository not configured", err}
+	}
+	collections := map[string]string{}
+	collections["ref"] = req.RefName
+	return HandleGenericJobConfig(repo, "commit", req.Commit, collections)
 }

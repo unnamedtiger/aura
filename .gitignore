@@ -1,3 +1,4 @@
+controller/config.json
 controller/controller.exe
 controller/*.db
 runner-native/config.json
