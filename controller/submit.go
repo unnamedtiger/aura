@@ -69,6 +69,12 @@ func InitializeSubmitEndpoints() {
 				log.Fatalln(err)
 			}
 			log.Printf("Initialized submit endpoint for Darke at /api/submit/darke\n")
+		} else if cfgKey == "gitea" {
+			submitEndpoints["gitea"], err = NewSubmitEndpointGitea(cfg["gitea"])
+			if err != nil {
+				log.Fatalln(err)
+			}
+			log.Printf("Initialized submit endpoint for Gitea at /api/submit/gitea\n")
 		} else {
 			log.Fatalf("Unknown integration '%s'\n", cfgKey)
 		}
@@ -375,4 +381,53 @@ func (e *SubmitEndpointDarke) HandleRequest(r *http.Request) (Submission, *Submi
 	collections := map[string]string{}
 	collections["ref"] = req.RefName
 	return HandleGenericJobConfig(repo, "commit", req.Commit, collections)
+}
+
+// =============================================================================
+// /api/submit/gitea
+// =============================================================================
+
+type SubmitEndpointGitea struct {
+	Repos map[string]GenericJobConfig `json:"repos"`
+}
+
+type SubmitRequestGitea struct {
+	Ref   string `json:"ref"`
+	After string `json:"after"`
+
+	Repository SubmitRequestGiteaRepository `json:"repository"`
+}
+
+type SubmitRequestGiteaRepository struct {
+	FullName string `json:"full_name"`
+}
+
+func NewSubmitEndpointGitea(cfgData json.RawMessage) (*SubmitEndpointGitea, error) {
+	var endpoint SubmitEndpointGitea
+	err := json.Unmarshal(cfgData, &endpoint)
+	if err != nil {
+		return nil, err
+	}
+	return &endpoint, nil
+}
+
+func (e *SubmitEndpointGitea) HandleRequest(r *http.Request) (Submission, *SubmitError) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return Submission{}, &SubmitError{http.StatusInternalServerError, "internal server error", err}
+	}
+	var req SubmitRequestGitea
+	err = json.Unmarshal(body, &req)
+	if err != nil {
+		return Submission{}, &SubmitError{http.StatusBadRequest, "unable to unmarshal json object", err}
+	}
+	repo, found := e.Repos[req.Repository.FullName]
+	if !found {
+		return Submission{}, &SubmitError{http.StatusBadRequest, "repository not configured", err}
+	}
+	refParts := strings.Split(req.Ref, "/")
+	refName := refParts[len(refParts)-1]
+	collections := map[string]string{}
+	collections["ref"] = refName
+	return HandleGenericJobConfig(repo, "commit", req.After, collections)
 }

@@ -97,6 +97,7 @@ Once the job ran to completion, browse to the entity inside your project to see 
 You probably don't want to submit jobs manually, so instead integrate with one of the following version control servers:
 
 * [Darke Files](docs/submit-darke.md)
+* [Gitea](docs/submit-gitea.md)
 
 Enable an integration by creating a file `config.json` in the working directory of the controller.
 Inside the root object add a new object with the integration's ID as name for every integration you want to enable.

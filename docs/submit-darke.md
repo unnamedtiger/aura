@@ -9,7 +9,7 @@
     "user/repo": {
         "project": "foo",
         "name": "prepare",
-        "cmd": "daf clone https://darke.example/user/repo && ./run.sh",
+        "cmd": "daf clone --identity buildbot@darke.example --server https://darke.example/user/repo && ./run.sh",
         "env": "FOO=bar",
         "tag": "native,linux"
     }
