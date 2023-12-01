@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 - 2023-12-01
+
+* Introduced internal API for job submission endpoints and job status updates
+* Added submission endpoint for Darke Files server
+* Added submission endpoint for Gitea
+* Added job status feedback to Gitea
+* Fixed potential race condition in job submission
+* Fixed job not getting cancelled if preceding job already failed
+* Updated styles
+
 ## 0.3.0 - 2023-11-05
 
 These are **BREAKING CHANGES** to the API endpoints.
