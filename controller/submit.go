@@ -2,6 +2,10 @@ package main
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -231,13 +235,13 @@ func RouteApiSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 	sub, err := endpoint.HandleRequest(r)
 	if err != nil {
-		log.Println(err.err)
+		log.Printf("%d %s %s\n", err.code, err.msg, err.err)
 		respondError(w, err.code, err.msg)
 		return
 	}
 	jobId, err := Submit(sub)
 	if err != nil {
-		log.Println(err.err)
+		log.Printf("%d %s %s\n", err.code, err.msg, err.err)
 		respondError(w, err.code, err.msg)
 		return
 	}
@@ -497,6 +501,7 @@ type SubmitEndpointGiteaJobConfig struct {
 	GenericJobConfig
 
 	Authorization string `json:"authorization"`
+	Secret        string `json:"secret"`
 }
 
 type SubmitRequestGitea struct {
@@ -534,6 +539,18 @@ func (e *SubmitEndpointGitea) HandleRequest(r *http.Request) (Submission, *Submi
 	if !found {
 		return Submission{}, &SubmitError{http.StatusBadRequest, "repository not configured", err}
 	}
+	signatureHeader := r.Header.Get("X-Hub-Signature-256")
+	if signatureHeader == "" {
+		return Submission{}, &SubmitError{http.StatusUnauthorized, "missing signature", err}
+	}
+	valid, err := validateWebhook(signatureHeader, repo.Secret, body)
+	if err != nil {
+		return Submission{}, &SubmitError{http.StatusInternalServerError, "internal server error", err}
+	}
+	if !valid {
+		return Submission{}, &SubmitError{http.StatusUnauthorized, "invalid signature", err}
+	}
+
 	refParts := strings.Split(req.Ref, "/")
 	refName := refParts[len(refParts)-1]
 	collections := map[string]string{}
@@ -589,4 +606,19 @@ func (e *SubmitEndpointGitea) UpdateEntityStatus(project Project, entity EntityO
 			return
 		}
 	}
+}
+
+func validateWebhook(signature string, secret string, payload []byte) (bool, error) {
+	if !strings.HasPrefix(signature, "sha256=") {
+		return false, nil
+	}
+	signature = signature[7:]
+	if secret == "" && signature == "" {
+		return true, nil
+	}
+
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write(payload)
+	sig := hex.EncodeToString(h.Sum(nil))
+	return subtle.ConstantTimeCompare([]byte(signature), []byte(sig)) == 1, nil
 }
