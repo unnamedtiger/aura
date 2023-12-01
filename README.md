@@ -99,8 +99,17 @@ You probably don't want to submit jobs manually, so instead integrate with one o
 * [Darke Files](docs/submit-darke.md)
 * [Gitea](docs/submit-gitea.md)
 
-Enable an integration by creating a file `config.json` in the working directory of the controller.
-Inside the root object add a new object with the integration's ID as name for every integration you want to enable.
+Start by creating a file `config.json` in the working directory of the controller with the following content:
+
+```json
+{
+    "baseUrl": "http://aura.example:8420"
+}
+```
+
+Set the base URL so that the integrations can reach your Aura server.
+
+To enable an integration add a new object with the integration's ID as name.
 Put the integration's configuration inside that inner object.
 
 Of course you can also write your own tool that submits jobs to `/api/submit`.

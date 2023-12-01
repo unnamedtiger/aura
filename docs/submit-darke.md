@@ -9,7 +9,7 @@
     "user/repo": {
         "project": "foo",
         "name": "prepare",
-        "cmd": "daf clone --identity buildbot@darke.example --server https://darke.example/user/repo && ./run.sh",
+        "cmd": "cihelper daf https://darke.example/user/repo",
         "env": "FOO=bar",
         "tag": "native,linux"
     }
@@ -17,7 +17,7 @@
 ```
 
 * `user/repo` is the username plus reponame pair of the repository on your Darke server
-* `project` is the project name on Aura
+* `project` is the project slug on Aura
 * `name`, `cmd`, `env`, `tag` are the same as in the SubmitRequest
 
 ## Setup

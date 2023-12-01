@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
@@ -29,11 +31,17 @@ type SubmitError struct {
 
 type SubmitEndpoint interface {
 	HandleRequest(r *http.Request) (Submission, *SubmitError)
+	UpdateEntityStatus(project Project, entity EntityOrCollection)
 }
 
 var submitEndpoints map[string]SubmitEndpoint
 
+type GeneralConfig struct {
+	BaseUrl string `json:"baseUrl"`
+}
+
 func InitializeSubmitEndpoints() {
+	var gcfg GeneralConfig
 	var cfg map[string]json.RawMessage
 	submitEndpoints = map[string]SubmitEndpoint{}
 
@@ -47,11 +55,20 @@ func InitializeSubmitEndpoints() {
 		if err != nil {
 			log.Fatalln(err)
 		}
+		err = json.Unmarshal(data, &gcfg)
+		if err != nil {
+			log.Fatalln(err)
+		}
 		err = json.Unmarshal(data, &cfg)
 		if err != nil {
 			log.Fatalln(err)
 		}
 	}
+	baseUrl, err := url.Parse(gcfg.BaseUrl)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	gcfg.BaseUrl = fmt.Sprintf("%s://%s", baseUrl.Scheme, baseUrl.Host)
 
 	submitEndpoints[""] = NewSubmitEndpointGeneric()
 	log.Printf("Initialized generic submit endpoint at /api/submit\n")
@@ -63,14 +80,16 @@ func InitializeSubmitEndpoints() {
 	sort.Strings(cfgKeys)
 
 	for _, cfgKey := range cfgKeys {
-		if cfgKey == "darke" {
+		if cfgKey == "baseUrl" {
+			continue
+		} else if cfgKey == "darke" {
 			submitEndpoints["darke"], err = NewSubmitEndpointDarke(cfg["darke"])
 			if err != nil {
 				log.Fatalln(err)
 			}
 			log.Printf("Initialized submit endpoint for Darke at /api/submit/darke\n")
 		} else if cfgKey == "gitea" {
-			submitEndpoints["gitea"], err = NewSubmitEndpointGitea(cfg["gitea"])
+			submitEndpoints["gitea"], err = NewSubmitEndpointGitea(gcfg.BaseUrl, cfg["gitea"])
 			if err != nil {
 				log.Fatalln(err)
 			}
@@ -194,6 +213,8 @@ func submitPostprocessing(sub Submission, jobId int64, t time.Time, entityId int
 		log.Println(err)
 		return
 	}
+
+	UpdateEntityStatus(entityId)
 }
 
 func RouteApiSubmit(w http.ResponseWriter, r *http.Request) {
@@ -253,6 +274,75 @@ func HandleGenericJobConfig(cfg GenericJobConfig, entityKey string, entityVal st
 		},
 		ProjectId: project.Id,
 	}, nil
+}
+
+func UpdateEntityStatus(entityId int64) {
+	entity, err := LoadEntity(entityId)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	project, err := LoadProject(entity.ProjectId)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	for _, endpoint := range submitEndpoints {
+		endpoint.UpdateEntityStatus(project, entity)
+	}
+}
+
+func getEntityStatus(entityId int64) (string, string, error) {
+	jobs, err := FindJobs(entityId)
+	if err != nil {
+		return "", "", err
+	}
+	queued := 0  // submitted and created
+	running := 0 // started
+	cancelled := 0
+	succeeded := 0
+	failed := 0
+	for _, job := range jobs {
+		switch job.Status {
+		case StatusCreated:
+			queued += 1
+		case StatusStarted:
+			running += 1
+		case StatusCancelled:
+			cancelled += 1
+		case StatusSucceeded:
+			succeeded += 1
+		case StatusFailed:
+			failed += 1
+		case StatusSubmitted:
+			queued += 1
+		}
+	}
+	desc := []string{}
+	if queued > 0 {
+		desc = append(desc, fmt.Sprintf("%d queued", queued))
+	}
+	if running > 0 {
+		desc = append(desc, fmt.Sprintf("%d running", running))
+	}
+	if cancelled > 0 {
+		desc = append(desc, fmt.Sprintf("%d cancelled", cancelled))
+	}
+	if succeeded > 0 {
+		desc = append(desc, fmt.Sprintf("%d succeeded", succeeded))
+	}
+	if failed > 0 {
+		desc = append(desc, fmt.Sprintf("%d failed", failed))
+	}
+	state := ""
+	if queued > 0 || running > 0 {
+		state = "pending"
+	} else if failed > 0 {
+		state = "failure"
+	} else {
+		state = "success"
+	}
+	return strings.Join(desc, ", "), state, nil
 }
 
 // =============================================================================
@@ -340,6 +430,10 @@ func (SubmitEndpointGeneric) HandleRequest(r *http.Request) (Submission, *Submit
 	return Submission{req, project.Id}, nil
 }
 
+func (SubmitEndpointGeneric) UpdateEntityStatus(project Project, entity EntityOrCollection) {
+	// no-op
+}
+
 // =============================================================================
 // /api/submit/darke
 // =============================================================================
@@ -383,12 +477,26 @@ func (e *SubmitEndpointDarke) HandleRequest(r *http.Request) (Submission, *Submi
 	return HandleGenericJobConfig(repo, "commit", req.Commit, collections)
 }
 
+func (e *SubmitEndpointDarke) UpdateEntityStatus(project Project, entity EntityOrCollection) {
+	// no-op
+}
+
 // =============================================================================
 // /api/submit/gitea
 // =============================================================================
 
 type SubmitEndpointGitea struct {
-	Repos map[string]GenericJobConfig `json:"repos"`
+	auraBaseUrl string
+
+	Repos map[string]SubmitEndpointGiteaJobConfig `json:"repos"`
+
+	ApiBaseUrl string `json:"apiBaseUrl"`
+}
+
+type SubmitEndpointGiteaJobConfig struct {
+	GenericJobConfig
+
+	Authorization string `json:"authorization"`
 }
 
 type SubmitRequestGitea struct {
@@ -402,12 +510,13 @@ type SubmitRequestGiteaRepository struct {
 	FullName string `json:"full_name"`
 }
 
-func NewSubmitEndpointGitea(cfgData json.RawMessage) (*SubmitEndpointGitea, error) {
+func NewSubmitEndpointGitea(auraBaseUrl string, cfgData json.RawMessage) (*SubmitEndpointGitea, error) {
 	var endpoint SubmitEndpointGitea
 	err := json.Unmarshal(cfgData, &endpoint)
 	if err != nil {
 		return nil, err
 	}
+	endpoint.auraBaseUrl = auraBaseUrl
 	return &endpoint, nil
 }
 
@@ -429,5 +538,55 @@ func (e *SubmitEndpointGitea) HandleRequest(r *http.Request) (Submission, *Submi
 	refName := refParts[len(refParts)-1]
 	collections := map[string]string{}
 	collections["ref"] = refName
-	return HandleGenericJobConfig(repo, "commit", req.After, collections)
+	return HandleGenericJobConfig(repo.GenericJobConfig, "commit", req.After, collections)
+}
+
+func (e *SubmitEndpointGitea) UpdateEntityStatus(project Project, entity EntityOrCollection) {
+	if e.ApiBaseUrl != "" && entity.Key != "commit" {
+		return
+	}
+	for key, repo := range e.Repos {
+		if repo.Project == project.Slug {
+			type reqObject struct {
+				Context     string `json:"context"`     // label of who is providing this status
+				Description string `json:"description"` // high-level summary
+				State       string `json:"state"`       // "pending", "success", "error", or "failure"
+				TargetUrl   string `json:"target_url"`  // full URL to build output
+			}
+			description, state, err := getEntityStatus(entity.Id)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			targetUrl := fmt.Sprintf("%s/p/%s/%s/%s", e.auraBaseUrl, project.Slug, entity.Key, entity.Val)
+			reqObj := reqObject{Context: "Aura", Description: description, State: state, TargetUrl: targetUrl}
+
+			reqData, err := json.Marshal(reqObj)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			url := fmt.Sprintf("%s/repos/%s/statuses/%s", e.ApiBaseUrl, key, entity.Val)
+			req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(reqData))
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			if e.ApiBaseUrl == "https://api.github.com" {
+				req.Header.Set("Accept", "application/vnd.github+json")
+				req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+			}
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", repo.Authorization)
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			if resp.StatusCode != http.StatusCreated {
+				log.Println("got status " + resp.Status)
+			}
+			return
+		}
+	}
 }

@@ -156,6 +156,13 @@ func handlePrecedingJobCompleted(jobId int64, status int, now time.Time) {
 		log.Println(err)
 		return
 	}
+
+	job, err := LoadJob(jobId)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	UpdateEntityStatus(job.EntityId)
 }
 
 func RouteApiRunner(w http.ResponseWriter, r *http.Request) {
